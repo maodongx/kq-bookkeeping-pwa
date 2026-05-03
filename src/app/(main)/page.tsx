@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { Asset, Transaction } from "@/lib/types";
+import { Asset, Currency, Transaction } from "@/lib/types";
 import { isInvestment } from "@/lib/currency";
 import { fetchLatestRates } from "@/lib/exchange-rates";
 import { DashboardClient, EnrichedAsset } from "@/components/DashboardClient";
@@ -7,11 +7,16 @@ import { DashboardClient, EnrichedAsset } from "@/components/DashboardClient";
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  const [{ data: assets }, { data: transactions }, rates] = await Promise.all([
-    supabase.from("assets").select("*"),
-    supabase.from("transactions").select("*"),
-    fetchLatestRates(supabase),
-  ]);
+  const [{ data: assets }, { data: transactions }, rates, { data: { user } }] =
+    await Promise.all([
+      supabase.from("assets").select("*"),
+      supabase.from("transactions").select("*"),
+      fetchLatestRates(supabase),
+      supabase.auth.getUser(),
+    ]);
+
+  const defaultCurrency =
+    (user?.user_metadata?.default_currency as Currency) || "USD";
 
   const assetList = (assets || []) as Asset[];
   const txList = (transactions || []) as Transaction[];
@@ -66,7 +71,7 @@ export default async function DashboardPage() {
     <DashboardClient
       assets={enriched}
       rates={rates}
-      defaultCurrency="USD"
+      defaultCurrency={defaultCurrency}
       lastUpdate={lastUpdate}
     />
   );
