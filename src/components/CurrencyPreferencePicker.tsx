@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Tabs } from "@heroui/react";
 import { Currency } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -31,25 +32,24 @@ export function CurrencyPreferencePicker({
 
   return (
     <div className="flex items-center justify-between">
-      <span className="text-sm text-gray-500">
+      <span className="text-sm text-muted">
         默认币种{saving ? " ..." : ""}
       </span>
-      <div className="inline-flex rounded-full bg-gray-100 p-0.5">
-        {OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => handleChange(opt.value)}
-            disabled={saving}
-            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-              selected === opt.value
-                ? "bg-blue-600 text-white shadow-sm"
-                : "text-gray-500"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        selectedKey={selected}
+        onSelectionChange={(k) => handleChange(k as Currency)}
+      >
+        <Tabs.ListContainer>
+          <Tabs.List aria-label="默认币种">
+            {OPTIONS.map((opt) => (
+              <Tabs.Tab key={opt.value} id={opt.value} isDisabled={saving}>
+                {opt.label}
+                <Tabs.Indicator />
+              </Tabs.Tab>
+            ))}
+          </Tabs.List>
+        </Tabs.ListContainer>
+      </Tabs>
     </div>
   );
 }

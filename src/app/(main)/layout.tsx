@@ -8,8 +8,8 @@ export default async function MainLayout({ children }: { children: React.ReactNo
   if (!user) redirect("/login");
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <main className="flex-1 pb-20 overflow-y-auto">{children}</main>
+    <div className="flex min-h-screen flex-col bg-background">
+      <main className="flex-1 overflow-y-auto pb-20">{children}</main>
       <BottomTabBar />
     </div>
   );

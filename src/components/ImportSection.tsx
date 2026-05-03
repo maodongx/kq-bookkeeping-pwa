@@ -3,6 +3,9 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
+import { Tabs } from "@heroui/react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type ImportMode = "merge" | "replace";
 
@@ -62,52 +65,39 @@ export function ImportSection() {
 
   return (
     <div className="space-y-3">
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".json"
-        className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-200 file:text-sm file:font-medium file:bg-white file:text-gray-700"
-      />
+      <Input ref={fileRef} type="file" accept=".json" />
 
       <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-500">模式:</span>
-        <div className="inline-flex rounded-full bg-gray-100 p-0.5">
-          <button
-            onClick={() => setMode("merge")}
-            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-              mode === "merge"
-                ? "bg-blue-600 text-white shadow-sm"
-                : "text-gray-500"
-            }`}
-          >
-            合并
-          </button>
-          <button
-            onClick={() => setMode("replace")}
-            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-              mode === "replace"
-                ? "bg-red-600 text-white shadow-sm"
-                : "text-gray-500"
-            }`}
-          >
-            替换
-          </button>
-        </div>
+        <span className="text-sm text-muted">模式:</span>
+        <Tabs
+          selectedKey={mode}
+          onSelectionChange={(k) => setMode(k as ImportMode)}
+        >
+          <Tabs.ListContainer>
+            <Tabs.List aria-label="导入模式">
+              <Tabs.Tab id="merge">合并<Tabs.Indicator /></Tabs.Tab>
+              <Tabs.Tab id="replace">替换<Tabs.Indicator /></Tabs.Tab>
+            </Tabs.List>
+          </Tabs.ListContainer>
+        </Tabs>
       </div>
 
-      <button
-        onClick={handleImport}
-        disabled={loading}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium text-gray-700 active:bg-gray-50 disabled:opacity-50"
+      <Button
+        variant="outline"
+        fullWidth
+        onPress={handleImport}
+        isDisabled={loading}
       >
-        <Upload size={16} />
+        <Upload />
         {loading ? "导入中..." : "导入数据"}
-      </button>
+      </Button>
 
       {result && (
         <p
           className={`text-xs ${
-            result.startsWith("导入成功") ? "text-green-600" : "text-red-600"
+            result.startsWith("导入成功")
+              ? "text-success"
+              : "text-danger"
           }`}
         >
           {result}

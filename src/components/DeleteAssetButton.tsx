@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
 
 export function DeleteAssetButton({ assetId }: { assetId: string }) {
   const router = useRouter();
@@ -15,6 +16,8 @@ export function DeleteAssetButton({ assetId }: { assetId: string }) {
   }
 
   return (
-    <button onClick={handleDelete} className="text-red-500 text-sm">删除</button>
+    <Button variant="destructive" size="sm" onPress={handleDelete}>
+      删除
+    </Button>
   );
 }

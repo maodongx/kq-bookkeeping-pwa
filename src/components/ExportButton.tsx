@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function ExportButton() {
   const [loading, setLoading] = useState(false);
@@ -31,13 +32,14 @@ export function ExportButton() {
   }
 
   return (
-    <button
-      onClick={handleExport}
-      disabled={loading}
-      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium text-gray-700 active:bg-gray-50 disabled:opacity-50"
+    <Button
+      variant="outline"
+      fullWidth
+      onPress={handleExport}
+      isDisabled={loading}
     >
-      <Download size={16} />
+      <Download />
       {loading ? "导出中..." : "导出数据 (JSON)"}
-    </button>
+    </Button>
   );
 }

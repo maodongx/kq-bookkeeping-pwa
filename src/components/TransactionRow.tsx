@@ -11,6 +11,9 @@ import {
   getAvailableTxTypes,
   isInvestment,
 } from "@/lib/currency";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 export function TransactionRow({
   tx,
@@ -71,67 +74,79 @@ export function TransactionRow({
 
   if (isEditing) {
     return (
-      <form onSubmit={handleSave} className="py-2 space-y-2 border-b border-gray-50 last:border-0">
-        <div className="flex gap-1 flex-wrap">
+      <form onSubmit={handleSave} className="space-y-2 py-2">
+        <div className="flex flex-wrap gap-1">
           {getAvailableTxTypes(category).map((t) => (
-            <button
+            <Button
               key={t}
               type="button"
-              onClick={() => setType(t)}
-              className={`px-3 py-1 rounded-full text-xs font-medium ${
-                type === t ? "bg-blue-600 text-white" : "bg-gray-100"
-              }`}
+              size="sm"
+              variant={type === t ? "default" : "secondary"}
+              onPress={() => setType(t)}
             >
               {TX_TYPE_LABELS[t]}
-            </button>
+            </Button>
           ))}
         </div>
+
         {inv ? (
           <>
-            <input type="number" step="any" placeholder="数量" value={quantity} onChange={(e) => setQuantity(e.target.value)} required className="input text-sm" />
-            <input type="number" step="any" placeholder="单价" value={price} onChange={(e) => setPrice(e.target.value)} required className="input text-sm" />
+            <Input type="number" step="any" placeholder="数量" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
+            <Input type="number" step="any" placeholder="单价" value={price} onChange={(e) => setPrice(e.target.value)} required />
           </>
         ) : (
-          <input type="number" step="any" placeholder="金额" value={amount} onChange={(e) => setAmount(e.target.value)} required className="input text-sm" />
+          <Input type="number" step="any" placeholder="金额" value={amount} onChange={(e) => setAmount(e.target.value)} required />
         )}
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input text-sm" />
-        <input placeholder="备注" value={note} onChange={(e) => setNote(e.target.value)} className="input text-sm" />
+
+        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <Input placeholder="备注" value={note} onChange={(e) => setNote(e.target.value)} />
+
         <div className="flex gap-2">
-          <button type="button" onClick={onEditToggle} className="flex-1 py-1.5 rounded-lg border text-xs">取消</button>
-          <button type="submit" disabled={saving} className="flex-1 py-1.5 rounded-lg bg-blue-600 text-white text-xs disabled:opacity-50">保存</button>
+          <Button type="button" variant="outline" size="sm" className="flex-1" onPress={onEditToggle}>
+            取消
+          </Button>
+          <Button type="submit" size="sm" className="flex-1" isDisabled={saving}>
+            保存
+          </Button>
         </div>
+        <Separator />
       </form>
     );
   }
 
   return (
-    <div className="flex justify-between items-center py-1.5 border-b border-gray-50 last:border-0">
-      <button onClick={onEditToggle} className="flex-1 text-left">
-        <p className="text-sm font-medium">{TX_TYPE_LABELS[tx.type]}</p>
-        <p className="text-xs text-gray-400">
-          {tx.date}
-          {tx.note ? ` · ${tx.note}` : ""}
-        </p>
-      </button>
-      <div className="flex items-center gap-2">
-        <div className="text-right">
-          {inv && (
-            <p className="text-xs text-gray-500 tabular-nums">
-              {tx.quantity} @ {formatCurrency(tx.price, currency)}
-            </p>
-          )}
-          <p className="text-sm tabular-nums">
-            {formatCurrency(tx.amount, currency)}
+    <>
+      <div className="flex items-center justify-between py-1.5">
+        <button onClick={onEditToggle} className="flex-1 text-left">
+          <p className="text-sm font-medium">{TX_TYPE_LABELS[tx.type]}</p>
+          <p className="text-xs text-muted">
+            {tx.date}
+            {tx.note ? ` · ${tx.note}` : ""}
           </p>
-        </div>
-        <button
-          onClick={handleDelete}
-          disabled={deleting}
-          className="p-1.5 text-gray-300 active:text-red-500 rounded disabled:opacity-50"
-        >
-          <Trash2 size={15} />
         </button>
+        <div className="flex items-center gap-2">
+          <div className="text-right">
+            {inv && (
+              <p className="text-xs tabular-nums text-muted">
+                {tx.quantity} @ {formatCurrency(tx.price, currency)}
+              </p>
+            )}
+            <p className="text-sm tabular-nums">
+              {formatCurrency(tx.amount, currency)}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onPress={handleDelete}
+            isDisabled={deleting}
+            className="text-muted hover:text-danger"
+          >
+            <Trash2 />
+          </Button>
+        </div>
       </div>
-    </div>
+      <Separator />
+    </>
   );
 }

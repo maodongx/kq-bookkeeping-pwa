@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Currency } from "@/lib/types";
+import { Card, Separator } from "@heroui/react";
+import { Button } from "@/components/ui/button";
 import { CurrencyPreferencePicker } from "@/components/CurrencyPreferencePicker";
 import { ExportButton } from "@/components/ExportButton";
 import { ImportSection } from "@/components/ImportSection";
@@ -12,44 +14,46 @@ export default async function SettingsPage() {
     (user?.user_metadata?.default_currency as Currency) || "USD";
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="space-y-4 p-4">
       <h1 className="text-xl font-bold">设置</h1>
 
-      {/* Account Info */}
-      <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">账号</span>
-          <span>{user?.email}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">版本</span>
-          <span>1.0.0</span>
-        </div>
-      </div>
+      <Card>
+        <Card.Content className="space-y-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted">账号</span>
+            <span>{user?.email}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted">版本</span>
+            <span>1.0.0</span>
+          </div>
+        </Card.Content>
+      </Card>
 
-      {/* Display Preferences */}
-      <div className="bg-white rounded-xl p-4 shadow-sm">
-        <h2 className="font-semibold text-sm mb-3">显示偏好</h2>
-        <CurrencyPreferencePicker current={defaultCurrency} />
-      </div>
+      <Card>
+        <Card.Header>
+          <Card.Title>显示偏好</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <CurrencyPreferencePicker current={defaultCurrency} />
+        </Card.Content>
+      </Card>
 
-      {/* Data Management */}
-      <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
-        <h2 className="font-semibold text-sm mb-1">数据管理</h2>
-        <ExportButton />
-        <div className="border-t pt-3">
+      <Card>
+        <Card.Header>
+          <Card.Title>数据管理</Card.Title>
+        </Card.Header>
+        <Card.Content className="space-y-3">
+          <ExportButton />
+          <Separator />
           <ImportSection />
-        </div>
-      </div>
+        </Card.Content>
+      </Card>
 
-      {/* Logout */}
       <form action="/api/auth/signout" method="POST">
-        <button
-          type="submit"
-          className="w-full py-2.5 rounded-xl border border-red-200 text-red-600 text-sm font-medium"
-        >
+        <Button variant="destructive" fullWidth>
           退出登录
-        </button>
+        </Button>
       </form>
     </div>
   );

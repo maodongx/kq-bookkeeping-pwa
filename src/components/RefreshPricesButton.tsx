@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { refreshAllPrices } from "@/lib/prices";
+import { Button } from "@/components/ui/button";
 
 export function RefreshPricesButton() {
   const [loading, setLoading] = useState(false);
@@ -20,13 +21,14 @@ export function RefreshPricesButton() {
   }
 
   return (
-    <button
-      onClick={handleRefresh}
-      disabled={loading}
-      className="p-2 rounded-lg text-gray-500 active:bg-gray-100 disabled:opacity-50"
+    <Button
+      variant="ghost"
+      size="icon"
+      onPress={handleRefresh}
+      isDisabled={loading}
       aria-label="刷新价格"
     >
-      <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-    </button>
+      <RefreshCw className={loading ? "animate-spin" : ""} />
+    </Button>
   );
 }

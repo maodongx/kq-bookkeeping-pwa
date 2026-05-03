@@ -5,8 +5,18 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AssetCategory, Currency, TransactionType } from "@/lib/types";
 import { getAvailableTxTypes, TX_TYPE_LABELS, isInvestment } from "@/lib/currency";
+import { Card } from "@heroui/react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
-export function AddTransactionForm({ assetId, category, currency }: { assetId: string; category: AssetCategory; currency: Currency }) {
+export function AddTransactionForm({
+  assetId,
+  category,
+}: {
+  assetId: string;
+  category: AssetCategory;
+  currency: Currency;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
@@ -28,45 +38,79 @@ export function AddTransactionForm({ assetId, category, currency }: { assetId: s
     const amt = inv ? qty * p : parseFloat(amount);
 
     const { error } = await supabase.from("transactions").insert({
-      asset_id: assetId, type, quantity: inv ? qty : amt, price: p, amount: amt, date, note: note.trim() || null,
+      asset_id: assetId,
+      type,
+      quantity: inv ? qty : amt,
+      price: p,
+      amount: amt,
+      date,
+      note: note.trim() || null,
     });
 
-    if (error) { alert(error.message); }
-    else { setOpen(false); setQuantity(""); setPrice(""); setAmount(""); setNote(""); router.refresh(); }
+    if (error) {
+      alert(error.message);
+    } else {
+      setOpen(false);
+      setQuantity("");
+      setPrice("");
+      setAmount("");
+      setNote("");
+      router.refresh();
+    }
     setLoading(false);
   }
 
-  if (!open) return (
-    <button onClick={() => setOpen(true)} className="w-full py-2 bg-blue-600 text-white rounded-xl text-sm font-medium">+ 添加交易</button>
-  );
+  if (!open) {
+    return (
+      <Button fullWidth onPress={() => setOpen(true)}>
+        + 添加交易
+      </Button>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-sm">
-      <h2 className="font-semibold text-sm mb-3">添加交易</h2>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="flex gap-1 flex-wrap">
-          {getAvailableTxTypes(category).map((t) => (
-            <button key={t} type="button" onClick={() => setType(t)}
-              className={`px-3 py-1 rounded-full text-xs font-medium ${type === t ? "bg-blue-600 text-white" : "bg-gray-100"}`}>
-              {TX_TYPE_LABELS[t]}
-            </button>
-          ))}
-        </div>
-        {inv ? (
-          <>
-            <input type="number" step="any" placeholder="数量" value={quantity} onChange={(e) => setQuantity(e.target.value)} required className="input" />
-            <input type="number" step="any" placeholder="单价" value={price} onChange={(e) => setPrice(e.target.value)} required className="input" />
-          </>
-        ) : (
-          <input type="number" step="any" placeholder="金额" value={amount} onChange={(e) => setAmount(e.target.value)} required className="input" />
-        )}
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" />
-        <input placeholder="备注" value={note} onChange={(e) => setNote(e.target.value)} className="input" />
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setOpen(false)} className="flex-1 py-2 rounded-lg border text-sm">取消</button>
-          <button type="submit" disabled={loading} className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-50">确认</button>
-        </div>
-      </form>
-    </div>
+    <Card>
+      <Card.Header>
+        <Card.Title>添加交易</Card.Title>
+      </Card.Header>
+      <Card.Content>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="flex flex-wrap gap-1">
+            {getAvailableTxTypes(category).map((t) => (
+              <Button
+                key={t}
+                type="button"
+                size="sm"
+                variant={type === t ? "default" : "secondary"}
+                onPress={() => setType(t)}
+              >
+                {TX_TYPE_LABELS[t]}
+              </Button>
+            ))}
+          </div>
+
+          {inv ? (
+            <>
+              <Input type="number" step="any" placeholder="数量" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
+              <Input type="number" step="any" placeholder="单价" value={price} onChange={(e) => setPrice(e.target.value)} required />
+            </>
+          ) : (
+            <Input type="number" step="any" placeholder="金额" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          )}
+
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Input placeholder="备注" value={note} onChange={(e) => setNote(e.target.value)} />
+
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onPress={() => setOpen(false)}>
+              取消
+            </Button>
+            <Button type="submit" className="flex-1" isDisabled={loading}>
+              确认
+            </Button>
+          </div>
+        </form>
+      </Card.Content>
+    </Card>
   );
 }

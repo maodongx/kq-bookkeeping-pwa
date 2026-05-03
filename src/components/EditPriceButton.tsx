@@ -6,6 +6,8 @@ import { Pencil, Check, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Currency } from "@/lib/types";
 import { formatCurrency } from "@/lib/currency";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function EditPriceButton({
   assetId,
@@ -42,48 +44,53 @@ export function EditPriceButton({
 
   if (!editing) {
     return (
-      <button
-        onClick={() => {
+      <Button
+        variant="ghost"
+        size="sm"
+        onPress={() => {
           setPrice(currentPrice?.toString() || "");
           setEditing(true);
         }}
-        className="inline-flex items-center gap-1 text-blue-600"
+        className="text-accent"
       >
         <span className="font-mono">
           {currentPrice != null ? formatCurrency(currentPrice, currency) : "-"}
         </span>
         <Pencil size={14} />
-      </button>
+      </Button>
     );
   }
 
   return (
     <div className="inline-flex items-center gap-1">
-      <input
+      <Input
         type="number"
         step="any"
         value={price}
         onChange={(e) => setPrice(e.target.value)}
-        className="input w-28 text-sm py-1 px-2"
+        className="w-28"
         autoFocus
         onKeyDown={(e) => {
           if (e.key === "Enter") handleSave();
           if (e.key === "Escape") setEditing(false);
         }}
       />
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="p-1 text-green-600 active:bg-green-50 rounded"
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        onPress={handleSave}
+        isDisabled={saving}
+        className="text-success"
       >
-        <Check size={16} />
-      </button>
-      <button
-        onClick={() => setEditing(false)}
-        className="p-1 text-gray-400 active:bg-gray-50 rounded"
+        <Check />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        onPress={() => setEditing(false)}
       >
-        <X size={16} />
-      </button>
+        <X />
+      </Button>
     </div>
   );
 }

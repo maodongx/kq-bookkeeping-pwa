@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Currency, AssetCategory } from "@/lib/types";
 import { formatCurrency, CATEGORY_LABELS, isInvestment } from "@/lib/currency";
 import { RateMap, convertCurrency, totalNetWorth } from "@/lib/exchange-rates";
+import { cn } from "@/lib/utils";
+import { Card } from "@heroui/react";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { AllocationPieChart } from "./AllocationPieChart";
 import { RefreshPricesButton } from "./RefreshPricesButton";
@@ -62,13 +64,12 @@ export function DashboardClient({
   ).map(([name, value]) => ({ name, value }));
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
+    <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">总览</h1>
         <div className="flex items-center gap-2">
           {lastUpdate && (
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-muted">
               {new Date(lastUpdate).toLocaleString("zh-CN", {
                 month: "numeric",
                 day: "numeric",
@@ -81,27 +82,28 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* Currency Switcher */}
       <div className="flex justify-center">
         <CurrencySwitcher value={currency} onChange={setCurrency} />
       </div>
 
-      {/* Total Net Worth */}
       {assets.length > 0 ? (
-        <div className="bg-white rounded-xl p-5 shadow-sm text-center">
-          <p className="text-sm text-gray-500 mb-1">总资产</p>
-          <p className="text-3xl font-bold tabular-nums">
-            {formatCurrency(netWorth, currency)}
-          </p>
-        </div>
+        <Card className="py-2 text-center">
+          <Card.Content>
+            <p className="text-sm text-muted">总资产</p>
+            <p className="text-3xl font-bold tabular-nums">
+              {formatCurrency(netWorth, currency)}
+            </p>
+          </Card.Content>
+        </Card>
       ) : (
-        <div className="bg-white rounded-xl p-8 shadow-sm text-center text-gray-400">
-          <p className="text-4xl mb-2">📭</p>
-          <p>暂无资产，前往「资产」页面添加</p>
-        </div>
+        <Card className="py-4 text-center">
+          <Card.Content>
+            <p className="mb-2 text-4xl">📭</p>
+            <p className="text-muted">暂无资产，前往「资产」页面添加</p>
+          </Card.Content>
+        </Card>
       )}
 
-      {/* Per-Currency Breakdown */}
       {assets.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {(["USD", "JPY", "CNY"] as Currency[]).map((c) => {
@@ -115,25 +117,25 @@ export function DashboardClient({
               );
             if (total === 0) return null;
             return (
-              <div
-                key={c}
-                className="bg-white rounded-xl p-3 shadow-sm text-center"
-              >
-                <p className="text-xs text-gray-400">{c}</p>
-                <p className="text-sm font-semibold tabular-nums mt-0.5">
-                  {formatCurrency(total, currency)}
-                </p>
-              </div>
+              <Card key={c} className="gap-1 py-2">
+                <Card.Content className="text-center">
+                  <p className="text-xs text-muted">{c}</p>
+                  <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                    {formatCurrency(total, currency)}
+                  </p>
+                </Card.Content>
+              </Card>
             );
           })}
         </div>
       )}
 
-      {/* Investment Gain/Loss Summary */}
       {investments.length > 0 && (
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <h2 className="font-semibold text-sm mb-3">投资盈亏</h2>
-          <div className="space-y-2">
+        <Card>
+          <Card.Header>
+            <Card.Title>投资盈亏</Card.Title>
+          </Card.Header>
+          <Card.Content className="space-y-2">
             {investments.map((a) => {
               const converted = convertCurrency(
                 a.marketValue,
@@ -148,10 +150,10 @@ export function DashboardClient({
                 rates
               );
               return (
-                <div key={a.id} className="flex justify-between items-center">
+                <div key={a.id} className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium">{a.name}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-muted">
                       {CATEGORY_LABELS[a.category]}
                       {a.symbol ? ` · ${a.symbol}` : ""}
                     </p>
@@ -161,9 +163,10 @@ export function DashboardClient({
                       {formatCurrency(converted, currency)}
                     </p>
                     <p
-                      className={`text-xs tabular-nums ${
+                      className={cn(
+                        "text-xs tabular-nums",
                         a.gainLoss >= 0 ? "text-red-600" : "text-green-600"
-                      }`}
+                      )}
                     >
                       {a.gainLoss >= 0 ? "+" : ""}
                       {formatCurrency(convertedGain, currency)} (
@@ -174,15 +177,16 @@ export function DashboardClient({
                 </div>
               );
             })}
-          </div>
-        </div>
+          </Card.Content>
+        </Card>
       )}
 
-      {/* Asset Detail List */}
       {assets.length > 0 && (
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <h2 className="font-semibold text-sm mb-3">资产明细</h2>
-          <div className="space-y-2">
+        <Card>
+          <Card.Header>
+            <Card.Title>资产明细</Card.Title>
+          </Card.Header>
+          <Card.Content className="space-y-2">
             {assets.map((a) => {
               const converted = convertCurrency(
                 a.marketValue,
@@ -194,7 +198,7 @@ export function DashboardClient({
                 <div key={a.id} className="flex justify-between py-1">
                   <div>
                     <p className="text-sm font-medium">{a.name}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-muted">
                       {CATEGORY_LABELS[a.category]}
                     </p>
                   </div>
@@ -204,11 +208,10 @@ export function DashboardClient({
                 </div>
               );
             })}
-          </div>
-        </div>
+          </Card.Content>
+        </Card>
       )}
 
-      {/* Pie Charts */}
       <AllocationPieChart data={byCategory} title="按类别分配" />
       <AllocationPieChart data={byCurrency} title="按币种分配" />
     </div>

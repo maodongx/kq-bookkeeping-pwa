@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { Card, Button, Input, Label, TextField } from "@heroui/react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -32,57 +33,44 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">KQ 记账</h1>
-          <p className="text-gray-500 text-sm mt-1">家庭资产管理</p>
-        </div>
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <Card className="w-full max-w-sm">
+        <Card.Header className="text-center">
+          <Card.Title className="text-2xl">KQ 记账</Card.Title>
+          <Card.Description>家庭资产管理</Card.Description>
+        </Card.Header>
+        <Card.Content>
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            <TextField name="email" type="email" isRequired>
+              <Label>邮箱</Label>
+              <Input
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                variant="secondary"
+              />
+            </TextField>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              邮箱
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              placeholder="your@email.com"
-            />
-          </div>
+            <TextField name="password" type="password" isRequired>
+              <Label>密码</Label>
+              <Input
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                variant="secondary"
+              />
+            </TextField>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              密码
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              placeholder="••••••••"
-            />
-          </div>
+            {error && (
+              <p className="text-sm text-danger">{error}</p>
+            )}
 
-          {error && (
-            <p className="text-red-600 text-sm">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-blue-600 px-4 py-2 text-white font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "登录中..." : "登录"}
-          </button>
-        </form>
-      </div>
+            <Button type="submit" className="w-full" isDisabled={loading}>
+              {loading ? "登录中..." : "登录"}
+            </Button>
+          </form>
+        </Card.Content>
+      </Card>
     </div>
   );
 }

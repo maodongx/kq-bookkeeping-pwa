@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Card, Tabs } from "@heroui/react";
 import { Asset, Transaction, AssetPriceSnapshot, ExchangeRateSnapshot, Currency } from "@/lib/types";
 import { RateMap } from "@/lib/exchange-rates";
 import {
@@ -50,40 +51,39 @@ export function ChartsClient({
   );
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="space-y-4 p-4">
       <h1 className="text-xl font-bold">分析</h1>
 
       <div className="flex justify-center">
         <CurrencySwitcher value={currency} onChange={setCurrency} />
       </div>
 
-      {/* Time Range Picker */}
       <div className="flex justify-center">
-        <div className="inline-flex rounded-full bg-gray-100 p-0.5">
-          {TIME_RANGES.map((r) => (
-            <button
-              key={r}
-              onClick={() => setRange(r)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                range === r
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-gray-500"
-              }`}
-            >
-              {TIME_RANGE_LABELS[r]}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          selectedKey={range}
+          onSelectionChange={(k) => setRange(k as TimeRange)}
+        >
+          <Tabs.ListContainer>
+            <Tabs.List aria-label="时间范围">
+              {TIME_RANGES.map((r) => (
+                <Tabs.Tab key={r} id={r}>
+                  {TIME_RANGE_LABELS[r]}
+                  <Tabs.Indicator />
+                </Tabs.Tab>
+              ))}
+            </Tabs.List>
+          </Tabs.ListContainer>
+        </Tabs>
       </div>
 
       <NetWorthLineChart data={timeSeries} currency={currency} />
       <GainLossBarChart data={gainLossData} currency={currency} />
 
       {assets.length === 0 && (
-        <div className="bg-white rounded-xl p-8 shadow-sm text-center text-gray-400">
-          <p className="text-4xl mb-2">📈</p>
-          <p>添加资产和交易后将展示分析</p>
-        </div>
+        <Card className="p-8 text-center">
+          <p className="mb-2 text-4xl">📈</p>
+          <p className="text-muted">添加资产和交易后将展示分析</p>
+        </Card>
       )}
     </div>
   );

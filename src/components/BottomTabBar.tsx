@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Wallet, BarChart3, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/", label: "总览", icon: LayoutDashboard },
@@ -20,7 +21,7 @@ export function BottomTabBar() {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around z-50 pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed inset-x-0 bottom-0 z-50 flex justify-around border-t border-separator bg-surface pb-[env(safe-area-inset-bottom)]">
       {TABS.map((tab) => {
         const active = isActive(tab.href);
         const Icon = tab.icon;
@@ -28,9 +29,10 @@ export function BottomTabBar() {
           <Link
             key={tab.href}
             href={tab.href}
-            className={`flex flex-col items-center py-2 px-3 text-xs transition-colors ${
-              active ? "text-blue-600" : "text-gray-400"
-            }`}
+            className={cn(
+              "flex flex-col items-center px-3 py-2 text-xs transition-colors",
+              active ? "text-accent" : "text-muted"
+            )}
           >
             <Icon size={22} strokeWidth={active ? 2.2 : 1.8} />
             <span className="mt-0.5">{tab.label}</span>
