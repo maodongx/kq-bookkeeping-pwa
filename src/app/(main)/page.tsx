@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Asset, Transaction } from "@/lib/types";
 import { formatCurrency, CATEGORY_LABELS, isInvestment } from "@/lib/currency";
+import { RefreshPricesButton } from "@/components/RefreshPricesButton";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -8,6 +9,12 @@ export default async function DashboardPage() {
   const { data: transactions } = await supabase.from("transactions").select("*");
   const assetList = (assets || []) as Asset[];
   const txList = (transactions || []) as Transaction[];
+
+  const lastUpdate = assetList
+    .map((a) => a.last_price_update)
+    .filter(Boolean)
+    .sort()
+    .pop();
 
   const enriched = assetList.map((asset) => {
     const assetTxs = txList.filter((tx) => tx.asset_id === asset.id);
@@ -33,7 +40,22 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-4 space-y-4">
-      <h1 className="text-xl font-bold">总览</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">总览</h1>
+        <div className="flex items-center gap-2">
+          {lastUpdate && (
+            <span className="text-xs text-gray-400">
+              {new Date(lastUpdate).toLocaleString("zh-CN", {
+                month: "numeric",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
+          <RefreshPricesButton />
+        </div>
+      </div>
       <div className="space-y-2">
         {Object.entries(byCurrency).map(([currency, total]) => (
           <div key={currency} className="bg-white rounded-xl p-4 shadow-sm">
