@@ -1,9 +1,33 @@
-export default function ChartsPage() {
+import { createClient } from "@/lib/supabase/server";
+import { Asset, Transaction, AssetPriceSnapshot, ExchangeRateSnapshot } from "@/lib/types";
+import { fetchLatestRates } from "@/lib/exchange-rates";
+import { ChartsClient } from "@/components/ChartsClient";
+
+export default async function ChartsPage() {
+  const supabase = await createClient();
+
+  const [
+    { data: assets },
+    { data: transactions },
+    { data: priceSnapshots },
+    { data: rateSnapshots },
+    rates,
+  ] = await Promise.all([
+    supabase.from("assets").select("*"),
+    supabase.from("transactions").select("*"),
+    supabase.from("asset_price_snapshots").select("*").order("date"),
+    supabase.from("exchange_rate_snapshots").select("*").order("date"),
+    fetchLatestRates(supabase),
+  ]);
+
   return (
-    <div className="p-4 text-center text-gray-400 pt-20">
-      <p className="text-4xl mb-2">📈</p>
-      <p className="font-medium">分析图表</p>
-      <p className="text-sm mt-1">添加资产和交易后将展示分析</p>
-    </div>
+    <ChartsClient
+      assets={(assets || []) as Asset[]}
+      transactions={(transactions || []) as Transaction[]}
+      priceSnapshots={(priceSnapshots || []) as AssetPriceSnapshot[]}
+      rateSnapshots={(rateSnapshots || []) as ExchangeRateSnapshot[]}
+      rates={rates}
+      defaultCurrency="USD"
+    />
   );
 }
