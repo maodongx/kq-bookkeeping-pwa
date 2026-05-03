@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { Asset, Transaction } from "@/lib/types";
-import { formatCurrency, CATEGORY_LABELS, TX_TYPE_LABELS, isInvestment } from "@/lib/currency";
+import { formatCurrency, CATEGORY_LABELS, isInvestment } from "@/lib/currency";
 import Link from "next/link";
 import { DeleteAssetButton } from "@/components/DeleteAssetButton";
 import { AddTransactionForm } from "@/components/AddTransactionForm";
+import { EditPriceButton } from "@/components/EditPriceButton";
+import { TransactionList } from "@/components/TransactionList";
 
 export default async function AssetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -42,7 +44,10 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
         <Link href="/assets" className="text-blue-600 text-sm">← 返回</Link>
-        <DeleteAssetButton assetId={a.id} />
+        <div className="flex items-center gap-2">
+          <Link href={`/assets/${a.id}/edit`} className="text-blue-600 text-sm">编辑</Link>
+          <DeleteAssetButton assetId={a.id} />
+        </div>
       </div>
 
       <div className="bg-white rounded-xl p-4 shadow-sm">
@@ -53,32 +58,19 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
       <div className="bg-white rounded-xl p-4 shadow-sm space-y-2 text-sm">
         {inv && <Row label="持有数量" value={totalQty.toFixed(4)} />}
         {inv && <Row label="平均成本" value={totalQty > 0 ? formatCurrency(totalCost / totalQty, a.currency) : "-"} />}
-        {inv && a.current_price && <Row label="当前价格" value={formatCurrency(a.current_price, a.currency)} />}
+        {inv && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">当前价格</span>
+            <EditPriceButton assetId={a.id} currentPrice={a.current_price} currency={a.currency} />
+          </div>
+        )}
         <Row label={inv ? "市值" : "余额"} value={formatCurrency(marketValue, a.currency)} />
         {inv && <Row label="盈亏" value={`${formatCurrency(gainLoss, a.currency)} (${gainLoss >= 0 ? "+" : ""}${gainPct.toFixed(2)}%)`} color={gainLoss >= 0 ? "text-red-600" : "text-green-600"} />}
       </div>
 
       <AddTransactionForm assetId={a.id} category={a.category} currency={a.currency} />
 
-      <div className="bg-white rounded-xl p-4 shadow-sm">
-        <h2 className="font-semibold text-sm mb-2">交易记录 ({txList.length})</h2>
-        {txList.length === 0 ? <p className="text-gray-400 text-sm">暂无</p> : (
-          <div className="space-y-2">
-            {txList.map((tx) => (
-              <div key={tx.id} className="flex justify-between py-1 border-b border-gray-50 last:border-0">
-                <div>
-                  <p className="text-sm font-medium">{TX_TYPE_LABELS[tx.type]}</p>
-                  <p className="text-xs text-gray-400">{tx.date}</p>
-                </div>
-                <div className="text-right">
-                  {inv && <p className="text-xs text-gray-500">{tx.quantity} @ {formatCurrency(tx.price, a.currency)}</p>}
-                  <p className="text-sm font-mono">{formatCurrency(tx.amount, a.currency)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <TransactionList transactions={txList} category={a.category} currency={a.currency} />
     </div>
   );
 }
