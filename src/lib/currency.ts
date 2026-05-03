@@ -25,6 +25,12 @@ export const CURRENCY_LABELS: Record<Currency, string> = {
   CNY: "人民币 ¥",
 };
 
+export const CURRENCY_SYMBOLS: Record<Currency, string> = {
+  USD: "$",
+  JPY: "¥",
+  CNY: "¥",
+};
+
 export const TX_TYPE_LABELS: Record<TransactionType, string> = {
   buy: "买入",
   sell: "卖出",
