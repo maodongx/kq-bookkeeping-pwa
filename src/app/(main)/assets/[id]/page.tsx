@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Asset, Transaction } from "@/lib/types";
-import { formatCurrency, CATEGORY_LABELS, isInvestment } from "@/lib/currency";
+import { formatCurrency, CATEGORY_LABELS, RISK_LABELS, isInvestment } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Card, Chip } from "@heroui/react";
@@ -64,10 +64,12 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
       <Card>
         <Card.Header>
           <Card.Title className="text-lg">{a.name}</Card.Title>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <Chip variant="secondary">{CATEGORY_LABELS[a.category]}</Chip>
             <Chip variant="tertiary">{a.currency}</Chip>
             {a.symbol && <Chip variant="tertiary">{a.symbol}</Chip>}
+            {a.tag && <Chip variant="tertiary">{a.tag}</Chip>}
+            {a.risk_level && <Chip variant="tertiary">{RISK_LABELS[a.risk_level]}</Chip>}
           </div>
         </Card.Header>
       </Card>

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Asset } from "@/lib/types";
-import { CATEGORY_LABELS } from "@/lib/currency";
+import { CATEGORY_LABELS, RISK_LABELS } from "@/lib/currency";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { Card, Chip, Link as HeroLink } from "@heroui/react";
@@ -53,11 +53,17 @@ export default async function AssetsPage() {
                   >
                     <div>
                       <p className="text-sm font-medium">{asset.name}</p>
-                      {asset.symbol && (
-                        <Chip variant="secondary" size="sm" className="mt-0.5">
-                          {asset.symbol}
-                        </Chip>
-                      )}
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                        {asset.symbol && (
+                          <Chip variant="secondary" size="sm">{asset.symbol}</Chip>
+                        )}
+                        {asset.tag && (
+                          <Chip variant="tertiary" size="sm">{asset.tag}</Chip>
+                        )}
+                        {asset.risk_level && (
+                          <Chip variant="tertiary" size="sm">{RISK_LABELS[asset.risk_level]}</Chip>
+                        )}
+                      </div>
                     </div>
                     <ChevronRight className="size-4 text-muted" />
                   </Link>

@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { SortDescriptor } from "@heroui/react";
-import { Currency, AssetCategory } from "@/lib/types";
-import { formatCurrency, CATEGORY_LABELS, isInvestment } from "@/lib/currency";
+import { Currency, AssetCategory, AssetTag, RiskLevel } from "@/lib/types";
+import { formatCurrency, CATEGORY_LABELS, RISK_LABELS, isInvestment } from "@/lib/currency";
 import { RateMap, convertCurrency, totalNetWorth } from "@/lib/exchange-rates";
 import { refreshAllPrices } from "@/lib/prices";
 import { cn } from "@/lib/utils";
@@ -43,6 +43,8 @@ export interface EnrichedAsset {
   category: AssetCategory;
   currency: Currency;
   symbol: string | null;
+  tag: AssetTag | null;
+  riskLevel: RiskLevel | null;
   marketValue: number;
   totalCost: number;
   gainLoss: number;
@@ -101,10 +103,23 @@ export function DashboardClient({
     });
   }, [assets, sortDescriptor, currency, rates]);
 
-  const byCategory = Object.entries(
+  const byTag = Object.entries(
     assets.reduce(
       (acc, a) => {
-        const label = CATEGORY_LABELS[a.category];
+        const label = a.tag || "未分类";
+        acc[label] =
+          (acc[label] || 0) +
+          convertCurrency(a.marketValue, a.currency, currency, rates);
+        return acc;
+      },
+      {} as Record<string, number>
+    )
+  ).map(([name, value]) => ({ name, value }));
+
+  const byRisk = Object.entries(
+    assets.reduce(
+      (acc, a) => {
+        const label = a.riskLevel ? RISK_LABELS[a.riskLevel] : "未分类";
         acc[label] =
           (acc[label] || 0) +
           convertCurrency(a.marketValue, a.currency, currency, rates);
@@ -169,6 +184,8 @@ export function DashboardClient({
                     <SortHeader direction={sortDirection}>名称</SortHeader>
                   )}
                 </Table.Column>
+                <Table.Column id="tag">标签</Table.Column>
+                <Table.Column id="risk">风险</Table.Column>
                 <Table.Column allowsSorting id="value">
                   {({ sortDirection }) => (
                     <SortHeader direction={sortDirection}>市值</SortHeader>
@@ -200,6 +217,12 @@ export function DashboardClient({
                           {CATEGORY_LABELS[a.category]}
                           {a.symbol ? ` · ${a.symbol}` : ""}
                         </p>
+                      </Table.Cell>
+                      <Table.Cell className="text-xs text-muted">
+                        {a.tag || "—"}
+                      </Table.Cell>
+                      <Table.Cell className="text-xs text-muted">
+                        {a.riskLevel ? RISK_LABELS[a.riskLevel] : "—"}
                       </Table.Cell>
                       <Table.Cell className="text-right tabular-nums text-sm">
                         {formatCurrency(value, currency)}
@@ -234,7 +257,8 @@ export function DashboardClient({
         </Table>
       )}
 
-      <AllocationPieChart data={byCategory} title="按类别分配" />
+      <AllocationPieChart data={byTag} title="按标签分配" />
+      <AllocationPieChart data={byRisk} title="按风险等级分配" />
     </div>
   );
 }

@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { AssetCategory, Currency, FundProvider } from "@/lib/types";
-import { CATEGORY_LABELS, CURRENCY_LABELS } from "@/lib/currency";
+import { AssetCategory, AssetTag, RiskLevel, Currency, FundProvider } from "@/lib/types";
+import { CATEGORY_LABELS, CURRENCY_LABELS, TAG_LABELS, RISK_LABELS } from "@/lib/currency";
 import { Card } from "@heroui/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ export default function AddAssetPage() {
   const [currency, setCurrency] = useState<Currency>("USD");
   const [symbol, setSymbol] = useState("");
   const [fundProvider, setFundProvider] = useState<FundProvider>("mufg");
+  const [tag, setTag] = useState<AssetTag | "">("");
+  const [riskLevel, setRiskLevel] = useState<RiskLevel | "">("");
   const [note, setNote] = useState("");
   const [initialBalance, setInitialBalance] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,6 +38,8 @@ export default function AddAssetPage() {
         currency,
         symbol: symbol.trim() || null,
         fund_provider: category === "jpFund" ? fundProvider : category === "cnFund" ? "other" : null,
+        tag: tag || null,
+        risk_level: riskLevel || null,
         note: note.trim() || null,
       })
       .select()
@@ -139,6 +143,32 @@ export default function AddAssetPage() {
                 />
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label>标签</Label>
+              <NativeSelect
+                value={tag}
+                onChange={(e) => setTag(e.target.value as AssetTag | "")}
+              >
+                <option value="">无</option>
+                {TAG_LABELS.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </NativeSelect>
+            </div>
+
+            <div className="space-y-2">
+              <Label>风险等级</Label>
+              <NativeSelect
+                value={riskLevel}
+                onChange={(e) => setRiskLevel(e.target.value as RiskLevel | "")}
+              >
+                <option value="">无</option>
+                {Object.entries(RISK_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </NativeSelect>
+            </div>
 
             <div className="space-y-2">
               <Label>备注</Label>

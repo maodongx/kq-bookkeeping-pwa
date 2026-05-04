@@ -60,6 +60,8 @@ export default async function DashboardPage() {
       category: asset.category,
       currency: asset.currency,
       symbol: asset.symbol,
+      tag: asset.tag,
+      riskLevel: asset.risk_level,
       marketValue,
       totalCost,
       gainLoss,

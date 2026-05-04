@@ -1,4 +1,4 @@
-import { Currency, AssetCategory, TransactionType } from "./types";
+import { Currency, AssetCategory, TransactionType, AssetTag, RiskLevel } from "./types";
 
 export function formatCurrency(value: number, currency: Currency): string {
   const symbol = currency === "USD" ? "$" : "¥";
@@ -48,3 +48,13 @@ export function getAvailableTxTypes(category: AssetCategory): TransactionType[] 
 export function isInvestment(category: AssetCategory): boolean {
   return category === "usStock" || category === "jpFund" || category === "cnFund";
 }
+
+export const TAG_LABELS: AssetTag[] = [
+  "核心", "成长个股", "成长指数", "收益", "债券", "黄金", "主题", "现金",
+];
+
+export const RISK_LABELS: Record<RiskLevel, string> = {
+  low: "低风险",
+  medium: "中风险",
+  high: "高风险",
+};

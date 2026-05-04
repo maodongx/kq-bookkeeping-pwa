@@ -17,6 +17,10 @@ interface Slice {
   value: number;
 }
 
+function renderLabel({ name, percent }: { name?: string; percent?: number }) {
+  return `${name ?? ""} ${((percent ?? 0) * 100).toFixed(1)}%`;
+}
+
 export function AllocationPieChart({
   data,
   title,
@@ -34,7 +38,7 @@ export function AllocationPieChart({
         <Card.Title>{title}</Card.Title>
       </Card.Header>
       <Card.Content>
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={250}>
           <PieChart>
             <Pie
               data={filtered}
@@ -42,9 +46,11 @@ export function AllocationPieChart({
               nameKey="name"
               cx="50%"
               cy="50%"
-              innerRadius={45}
-              outerRadius={75}
+              innerRadius={40}
+              outerRadius={70}
               paddingAngle={2}
+              label={renderLabel}
+              labelLine={false}
             >
               {filtered.map((_, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
