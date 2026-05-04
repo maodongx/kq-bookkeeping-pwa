@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { ThemeProvider } from "next-themes";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
@@ -34,15 +33,12 @@ export default function RootLayout({
     <html
       lang="zh-CN"
       className={`${inter.variable} h-full antialiased`}
-      suppressHydrationWarning
     >
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <ThemeProvider attribute="class" defaultTheme="light">
-          {children}
-        </ThemeProvider>
+        {children}
         <ServiceWorkerRegister />
       </body>
     </html>

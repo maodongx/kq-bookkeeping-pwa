@@ -1,14 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import type { SortDescriptor } from "@heroui/react";
 import { Currency, AssetCategory } from "@/lib/types";
 import { formatCurrency, CATEGORY_LABELS, isInvestment } from "@/lib/currency";
 import { RateMap, convertCurrency, totalNetWorth } from "@/lib/exchange-rates";
+import { refreshAllPrices } from "@/lib/prices";
 import { cn } from "@/lib/utils";
-import { Card } from "@heroui/react";
+import { Card, Table } from "@heroui/react";
+import { ChevronUp } from "lucide-react";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { AllocationPieChart } from "./AllocationPieChart";
 import { RefreshPricesButton } from "./RefreshPricesButton";
+
+function SortHeader({
+  children,
+  direction,
+}: {
+  children: React.ReactNode;
+  direction?: "ascending" | "descending";
+}) {
+  return (
+    <span className="flex items-center gap-1">
+      {children}
+      {!!direction && (
+        <ChevronUp
+          size={14}
+          className={cn(
+            "transition-transform duration-100",
+            direction === "descending" && "rotate-180"
+          )}
+        />
+      )}
+    </span>
+  );
+}
 
 export interface EnrichedAsset {
   id: string;
@@ -34,9 +61,45 @@ export function DashboardClient({
   lastUpdate: string | null;
 }) {
   const [currency, setCurrency] = useState<Currency>(defaultCurrency);
+  const router = useRouter();
+  const hasRefreshed = useRef(false);
+
+  useEffect(() => {
+    if (hasRefreshed.current) return;
+    hasRefreshed.current = true;
+    refreshAllPrices().then(() => router.refresh());
+  }, [router]);
 
   const netWorth = totalNetWorth(assets, currency, rates);
-  const investments = assets.filter((a) => isInvestment(a.category));
+
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
+    column: "value",
+    direction: "descending",
+  });
+
+  const sortedAssets = useMemo(() => {
+    return [...assets].sort((a, b) => {
+      let cmp = 0;
+      const col = sortDescriptor.column;
+      if (col === "name") {
+        cmp = a.name.localeCompare(b.name);
+      } else if (col === "value") {
+        const va = convertCurrency(a.marketValue, a.currency, currency, rates);
+        const vb = convertCurrency(b.marketValue, b.currency, currency, rates);
+        cmp = va - vb;
+      } else if (col === "gainLoss") {
+        const ga = isInvestment(a.category)
+          ? convertCurrency(a.gainLoss, a.currency, currency, rates)
+          : -Infinity;
+        const gb = isInvestment(b.category)
+          ? convertCurrency(b.gainLoss, b.currency, currency, rates)
+          : -Infinity;
+        cmp = ga - gb;
+      }
+      if (sortDescriptor.direction === "descending") cmp *= -1;
+      return cmp;
+    });
+  }, [assets, sortDescriptor, currency, rates]);
 
   const byCategory = Object.entries(
     assets.reduce(
@@ -44,18 +107,6 @@ export function DashboardClient({
         const label = CATEGORY_LABELS[a.category];
         acc[label] =
           (acc[label] || 0) +
-          convertCurrency(a.marketValue, a.currency, currency, rates);
-        return acc;
-      },
-      {} as Record<string, number>
-    )
-  ).map(([name, value]) => ({ name, value }));
-
-  const byCurrency = Object.entries(
-    assets.reduce(
-      (acc, a) => {
-        acc[a.currency] =
-          (acc[a.currency] || 0) +
           convertCurrency(a.marketValue, a.currency, currency, rates);
         return acc;
       },
@@ -105,115 +156,85 @@ export function DashboardClient({
       )}
 
       {assets.length > 0 && (
-        <div className="grid grid-cols-3 gap-2">
-          {(["USD", "JPY", "CNY"] as Currency[]).map((c) => {
-            const total = assets
-              .filter((a) => a.currency === c)
-              .reduce(
-                (sum, a) =>
-                  sum +
-                  convertCurrency(a.marketValue, a.currency, currency, rates),
-                0
-              );
-            if (total === 0) return null;
-            return (
-              <Card key={c} className="gap-1 py-2">
-                <Card.Content className="text-center">
-                  <p className="text-xs text-muted">{c}</p>
-                  <p className="mt-0.5 text-sm font-semibold tabular-nums">
-                    {formatCurrency(total, currency)}
-                  </p>
-                </Card.Content>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {investments.length > 0 && (
-        <Card>
-          <Card.Header>
-            <Card.Title>投资盈亏</Card.Title>
-          </Card.Header>
-          <Card.Content className="space-y-2">
-            {investments.map((a) => {
-              const converted = convertCurrency(
-                a.marketValue,
-                a.currency,
-                currency,
-                rates
-              );
-              const convertedGain = convertCurrency(
-                a.gainLoss,
-                a.currency,
-                currency,
-                rates
-              );
-              return (
-                <div key={a.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{a.name}</p>
-                    <p className="text-xs text-muted">
-                      {CATEGORY_LABELS[a.category]}
-                      {a.symbol ? ` · ${a.symbol}` : ""}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm tabular-nums">
-                      {formatCurrency(converted, currency)}
-                    </p>
-                    <p
-                      className={cn(
-                        "text-xs tabular-nums",
-                        a.gainLoss >= 0 ? "text-red-600" : "text-green-600"
-                      )}
-                    >
-                      {a.gainLoss >= 0 ? "+" : ""}
-                      {formatCurrency(convertedGain, currency)} (
-                      {a.gainPct >= 0 ? "+" : ""}
-                      {a.gainPct.toFixed(2)}%)
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </Card.Content>
-        </Card>
-      )}
-
-      {assets.length > 0 && (
-        <Card>
-          <Card.Header>
-            <Card.Title>资产明细</Card.Title>
-          </Card.Header>
-          <Card.Content className="space-y-2">
-            {assets.map((a) => {
-              const converted = convertCurrency(
-                a.marketValue,
-                a.currency,
-                currency,
-                rates
-              );
-              return (
-                <div key={a.id} className="flex justify-between py-1">
-                  <div>
-                    <p className="text-sm font-medium">{a.name}</p>
-                    <p className="text-xs text-muted">
-                      {CATEGORY_LABELS[a.category]}
-                    </p>
-                  </div>
-                  <p className="text-sm tabular-nums">
-                    {formatCurrency(converted, currency)}
-                  </p>
-                </div>
-              );
-            })}
-          </Card.Content>
-        </Card>
+        <Table variant="secondary">
+          <Table.ScrollContainer>
+            <Table.Content
+              aria-label="资产明细"
+              sortDescriptor={sortDescriptor}
+              onSortChange={setSortDescriptor}
+            >
+              <Table.Header>
+                <Table.Column allowsSorting isRowHeader id="name">
+                  {({ sortDirection }) => (
+                    <SortHeader direction={sortDirection}>名称</SortHeader>
+                  )}
+                </Table.Column>
+                <Table.Column allowsSorting id="value">
+                  {({ sortDirection }) => (
+                    <SortHeader direction={sortDirection}>市值</SortHeader>
+                  )}
+                </Table.Column>
+                <Table.Column allowsSorting id="gainLoss">
+                  {({ sortDirection }) => (
+                    <SortHeader direction={sortDirection}>盈亏</SortHeader>
+                  )}
+                </Table.Column>
+              </Table.Header>
+              <Table.Body>
+                {sortedAssets.map((a) => {
+                  const value = convertCurrency(
+                    a.marketValue,
+                    a.currency,
+                    currency,
+                    rates
+                  );
+                  const inv = isInvestment(a.category);
+                  const gain = inv
+                    ? convertCurrency(a.gainLoss, a.currency, currency, rates)
+                    : null;
+                  return (
+                    <Table.Row key={a.id} id={a.id}>
+                      <Table.Cell>
+                        <p className="text-sm font-medium">{a.name}</p>
+                        <p className="text-xs text-muted">
+                          {CATEGORY_LABELS[a.category]}
+                          {a.symbol ? ` · ${a.symbol}` : ""}
+                        </p>
+                      </Table.Cell>
+                      <Table.Cell className="text-right tabular-nums text-sm">
+                        {formatCurrency(value, currency)}
+                      </Table.Cell>
+                      <Table.Cell className="text-right tabular-nums text-sm">
+                        {gain !== null ? (
+                          <span
+                            className={cn(
+                              a.gainLoss >= 0
+                                ? "text-red-600"
+                                : "text-green-600"
+                            )}
+                          >
+                            {a.gainLoss >= 0 ? "+" : ""}
+                            {formatCurrency(gain, currency)}
+                            <br />
+                            <span className="text-xs">
+                              ({a.gainPct >= 0 ? "+" : ""}
+                              {a.gainPct.toFixed(2)}%)
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </Table.Cell>
+                    </Table.Row>
+                  );
+                })}
+              </Table.Body>
+            </Table.Content>
+          </Table.ScrollContainer>
+        </Table>
       )}
 
       <AllocationPieChart data={byCategory} title="按类别分配" />
-      <AllocationPieChart data={byCurrency} title="按币种分配" />
     </div>
   );
 }
