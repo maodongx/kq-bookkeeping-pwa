@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Currency } from "@/lib/types";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, gainLossFill } from "@/lib/currency";
 import { GainLossItem } from "@/lib/chart-utils";
 import { Card } from "@heroui/react";
 
@@ -61,10 +61,7 @@ export function GainLossBarChart({
             />
             <Bar dataKey="gainLoss" radius={[0, 4, 4, 0]}>
               {data.map((entry, i) => (
-                <Cell
-                  key={i}
-                  fill={entry.gainLoss >= 0 ? "#dc2626" : "#16a34a"}
-                />
+                <Cell key={i} fill={gainLossFill(entry.gainLoss)} />
               ))}
             </Bar>
           </BarChart>

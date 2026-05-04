@@ -12,7 +12,7 @@ import {
   AssetPriceSnapshot,
   ExchangeRateSnapshot,
 } from "@/lib/types";
-import { formatCurrency, RISK_LABELS } from "@/lib/currency";
+import { formatCurrency, RISK_LABELS, RISK_COLORS, gainLossTextClass } from "@/lib/currency";
 import { RateMap, convertCurrency, totalNetWorth } from "@/lib/exchange-rates";
 import { computeNetWorthTimeSeries } from "@/lib/chart-utils";
 import { refreshAllPrices } from "@/lib/prices";
@@ -23,19 +23,9 @@ import { AllocationPieChart } from "./AllocationPieChart";
 import { RefreshPricesButton } from "./RefreshPricesButton";
 
 /**
- * Fixed color mapping for the risk-level pie chart so the visual meaning
- * stays stable regardless of slice ordering or which risk buckets exist
- * in the portfolio on a given day.
- *   低风险 => green  (safe)
- *   中风险 => yellow (moderate)
- *   高风险 => red    (risky)
- * Assets without a risk level get the default palette via "未分类".
+ * Risk-level palette lives in lib/currency.ts as RISK_COLORS so that any
+ * future badge or chip that shows a risk level agrees with this chart.
  */
-const RISK_COLORS: Record<string, string> = {
-  低风险: "#10b981", // emerald-500
-  中风险: "#f59e0b", // amber-500
-  高风险: "#ef4444", // red-500
-};
 
 export interface EnrichedAsset {
   id: string;
@@ -226,7 +216,7 @@ export function DashboardClient({
               <p className="text-xs text-muted">累计盈亏</p>
               <p className={cn(
                 "text-sm font-semibold tabular-nums",
-                totalGain >= 0 ? "text-red-600" : "text-green-600"
+                gainLossTextClass(totalGain)
               )}>
                 {formatCurrency(totalGain, currency)}
               </p>
@@ -237,7 +227,7 @@ export function DashboardClient({
               <p className="text-xs text-muted">近1月</p>
               <p className={cn(
                 "text-sm font-semibold tabular-nums",
-                monthChangePct != null && monthChangePct >= 0 ? "text-red-600" : "text-green-600"
+                gainLossTextClass(monthChangePct ?? 0)
               )}>
                 {monthChangePct != null
                   ? `${monthChangePct >= 0 ? "+" : ""}${monthChangePct.toFixed(2)}%`
@@ -250,7 +240,7 @@ export function DashboardClient({
               <p className="text-xs text-muted">年化</p>
               <p className={cn(
                 "text-sm font-semibold tabular-nums",
-                annualizedPct != null && annualizedPct >= 0 ? "text-red-600" : "text-green-600"
+                gainLossTextClass(annualizedPct ?? 0)
               )}>
                 {annualizedPct != null
                   ? `${annualizedPct >= 0 ? "+" : ""}${annualizedPct.toFixed(2)}%`

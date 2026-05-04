@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Asset, Transaction } from "@/lib/types";
-import { formatCurrency, CATEGORY_LABELS, RISK_LABELS, isInvestment } from "@/lib/currency";
+import { formatCurrency, CATEGORY_LABELS, RISK_LABELS, isInvestment, gainLossTextClass } from "@/lib/currency";
 import { computeHolding } from "@/lib/asset-calculations";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -82,7 +82,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
             <Row
               label="盈亏"
               value={`${formatCurrency(gainLoss, a.currency)} (${gainLoss >= 0 ? "+" : ""}${gainPct.toFixed(2)}%)`}
-              className={gainLoss >= 0 ? "text-red-600" : "text-green-600"}
+              className={gainLossTextClass(gainLoss)}
             />
           )}
         </Card.Content>

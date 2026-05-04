@@ -58,3 +58,38 @@ export const RISK_LABELS: Record<RiskLevel, string> = {
   medium: "中风险",
   high: "高风险",
 };
+
+/*
+ * Color conventions
+ *
+ * Gain / loss follows Asian finance convention: red = gain, green = loss.
+ *   - Tailwind: use GAIN_TEXT / LOSS_TEXT classes below.
+ *   - Chart fills (SVG): use GAIN_FILL / LOSS_FILL hex values.
+ *
+ * Risk level uses its own palette to avoid colliding with gain/loss.
+ *   低风险 -> green  (safe)
+ *   中风险 -> yellow (moderate)
+ *   高风险 -> orange (warning, NOT red — red already means "gain")
+ * This lives here because both the dashboard pie chart and any future
+ * badge/chip that needs a risk color should agree.
+ */
+export const GAIN_TEXT = "text-red-600";
+export const LOSS_TEXT = "text-green-600";
+export const GAIN_FILL = "#dc2626"; // red-600
+export const LOSS_FILL = "#16a34a"; // green-600
+
+export const RISK_COLORS: Record<string, string> = {
+  低风险: "#10b981", // emerald-500
+  中风险: "#f59e0b", // amber-500
+  高风险: "#f97316", // orange-500 — reserved warning color, distinct from gain red
+};
+
+/** Pick the tailwind text-color class for a gain/loss value. */
+export function gainLossTextClass(value: number): string {
+  return value >= 0 ? GAIN_TEXT : LOSS_TEXT;
+}
+
+/** Pick the SVG fill hex for a gain/loss value. */
+export function gainLossFill(value: number): string {
+  return value >= 0 ? GAIN_FILL : LOSS_FILL;
+}
