@@ -25,7 +25,7 @@ export default function EditAssetPage() {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const isInvestment = category === "usStock" || category === "jpFund";
+  const isInvestment = category === "usStock" || category === "jpFund" || category === "cnFund";
 
   useEffect(() => {
     async function load() {
@@ -58,7 +58,7 @@ export default function EditAssetPage() {
         category,
         currency,
         symbol: symbol.trim() || null,
-        fund_provider: category === "jpFund" ? fundProvider : null,
+        fund_provider: category === "jpFund" ? fundProvider : category === "cnFund" ? "other" : null,
         note: note.trim() || null,
       })
       .eq("id", params.id);
@@ -92,6 +92,7 @@ export default function EditAssetPage() {
                   setCategory(c);
                   if (c === "usStock") setCurrency("USD");
                   if (c === "jpFund") setCurrency("JPY");
+                  if (c === "cnFund") setCurrency("CNY");
                 }}
               >
                 {Object.entries(CATEGORY_LABELS).map(([k, v]) => (

@@ -79,6 +79,24 @@ async function fetchRakutenFundPrice(fundCode: string): Promise<number> {
   return price;
 }
 
+async function fetchCNFundPrice(fundCode: string): Promise<number> {
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const url = `https://fundgz.1234567.com.cn/js/${encodeURIComponent(fundCode)}.js?rt=${today}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+  });
+  if (!res.ok) throw new Error(`Tiantian Fund API returned ${res.status}`);
+
+  const text = await res.text();
+  const match = text.match(/jsonpgz\((.+)\)/);
+  if (!match) throw new Error("Could not parse JSONP response from Tiantian Fund");
+
+  const data = JSON.parse(match[1]);
+  const price = parseFloat(data?.dwjz);
+  if (isNaN(price)) throw new Error("dwjz not found in Tiantian Fund response");
+  return price;
+}
+
 async function fetchPriceForAsset(asset: Asset): Promise<number> {
   if (!asset.symbol) throw new Error("No symbol configured");
 
@@ -91,6 +109,10 @@ async function fetchPriceForAsset(asset: Asset): Promise<number> {
       return fetchMUFGFundPrice(asset.symbol);
     }
     return fetchRakutenFundPrice(asset.symbol);
+  }
+
+  if (asset.category === "cnFund") {
+    return fetchCNFundPrice(asset.symbol);
   }
 
   throw new Error(`Price fetching not supported for category: ${asset.category}`);
@@ -109,12 +131,7 @@ export async function POST() {
   const { data: assets } = await supabase.from("assets").select("*");
   const allAssets = (assets || []) as Asset[];
   const investmentAssets = allAssets.filter(
-    (a) => (a.category === "usStock" || a.category === "jpFund") && a.symbol
-  );
-
-  console.log(
-    `[prices] ${allAssets.length} total assets, ${investmentAssets.length} investment assets:`,
-    investmentAssets.map((a) => `${a.name} (${a.id}, ${a.category}, symbol=${a.symbol}, provider=${a.fund_provider})`)
+    (a) => (a.category === "usStock" || a.category === "jpFund" || a.category === "cnFund") && a.symbol
   );
 
   if (investmentAssets.length === 0) {
@@ -137,10 +154,8 @@ export async function POST() {
     const result = settled[i];
     const asset = investmentAssets[i];
     if (result.status === "fulfilled") {
-      console.log(`[prices] ✓ ${asset.name}: ${result.value.price}`);
       prices.push({ ...result.value, updatedAt: now });
     } else {
-      console.error(`[prices] ✗ ${asset.name} (${asset.id}): ${result.reason?.message}`);
       errors.push({
         assetId: asset.id,
         error: result.reason?.message || "Unknown error",

@@ -14,6 +14,7 @@ export function formatCurrency(value: number, currency: Currency): string {
 export const CATEGORY_LABELS: Record<AssetCategory, string> = {
   usStock: "美股",
   jpFund: "日本基金",
+  cnFund: "中国基金",
   bankDeposit: "银行存款",
   cash: "现金",
   other: "其他",
@@ -40,11 +41,10 @@ export const TX_TYPE_LABELS: Record<TransactionType, string> = {
 };
 
 export function getAvailableTxTypes(category: AssetCategory): TransactionType[] {
-  if (category === "usStock" || category === "jpFund") return ["buy", "sell"];
-  if (category === "bankDeposit" || category === "cash") return ["deposit", "withdraw", "adjustment"];
-  return ["buy", "sell", "deposit", "withdraw", "adjustment"];
+  if (category === "usStock" || category === "jpFund" || category === "cnFund") return ["buy", "sell"];
+  return ["deposit", "withdraw", "adjustment"];
 }
 
 export function isInvestment(category: AssetCategory): boolean {
-  return category === "usStock" || category === "jpFund";
+  return category === "usStock" || category === "jpFund" || category === "cnFund";
 }

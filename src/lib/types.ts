@@ -1,4 +1,4 @@
-export type AssetCategory = "usStock" | "jpFund" | "bankDeposit" | "cash" | "other";
+export type AssetCategory = "usStock" | "jpFund" | "cnFund" | "bankDeposit" | "cash" | "other";
 export type Currency = "USD" | "JPY" | "CNY";
 export type TransactionType = "buy" | "sell" | "deposit" | "withdraw" | "adjustment";
 export type FundProvider = "mufg" | "rakuten" | "other";
