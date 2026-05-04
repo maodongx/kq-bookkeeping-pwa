@@ -261,11 +261,18 @@ export function DashboardClient({
         </div>
       )}
 
-      <AllocationPieChart data={byTag} title="按标签分配" />
+      <AllocationPieChart
+        data={byTag}
+        title="按标签分配"
+        currency={currency}
+        centerLabel="总计"
+      />
       <AllocationPieChart
         data={byRisk}
         title="按风险等级分配"
         colorMap={RISK_COLORS}
+        currency={currency}
+        centerLabel="总计"
       />
     </div>
   );

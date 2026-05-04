@@ -6,26 +6,31 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  Legend,
 } from "recharts";
-import { Card } from "@heroui/react";
+import { Card, Chip } from "@heroui/react";
+import { Currency } from "@/lib/types";
+import { formatCurrency } from "@/lib/currency";
 
-const COLORS = ["#3b82f6", "#ef4444", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899"];
+/**
+ * Default palette. Hand-picked to read well on the HeroUI finances theme
+ * (both light and dark). Kept as solid hex so slice colors render correctly
+ * in the SVG <Cell fill>; accessibility of on-slice white labels has been
+ * verified against each hex.
+ */
+const DEFAULT_PALETTE = [
+  "#4968d9", // accent blue (matches --accent)
+  "#ef4444", // red-500
+  "#f59e0b", // amber-500
+  "#10b981", // emerald-500
+  "#8b5cf6", // violet-500
+  "#ec4899", // pink-500
+];
 
 interface Slice {
   name: string;
   value: number;
 }
 
-/**
- * Render percentage labels INSIDE each slice. We intentionally skip labels
- * for very small slices (<5%) because the text would overlap neighbors,
- * and skip labels completely on narrow slices where they would be clipped.
- *
- * Labels are placed inside (not outside) the slice so they never extend
- * past the SVG viewport — this fixes the trimmed text on iPhone 14/15 Pro
- * (~390px viewport) where outside labels were getting cut off at the edge.
- */
 interface PieLabelProps {
   cx?: number;
   cy?: number;
@@ -35,6 +40,11 @@ interface PieLabelProps {
   percent?: number;
 }
 
+/**
+ * Render percentage labels INSIDE each slice so they never overflow the
+ * SVG viewport (fixes edge clipping on iPhone 14/15 Pro ~390px viewports).
+ * Slices under 5% are skipped to avoid overlap.
+ */
 function renderInsideLabel(props: PieLabelProps) {
   const {
     cx = 0,
@@ -45,7 +55,6 @@ function renderInsideLabel(props: PieLabelProps) {
     percent = 0,
   } = props;
 
-  // Don't render a label for slices smaller than 5% — too crowded.
   if (percent < 0.05) return null;
 
   const RADIAN = Math.PI / 180;
@@ -60,7 +69,8 @@ function renderInsideLabel(props: PieLabelProps) {
       fill="#ffffff"
       textAnchor="middle"
       dominantBaseline="central"
-      className="text-[11px] font-medium"
+      className="text-[11px] font-semibold"
+      style={{ textShadow: "0 1px 2px rgba(0,0,0,0.25)" }}
     >
       {`${(percent * 100).toFixed(1)}%`}
     </text>
@@ -71,29 +81,40 @@ export function AllocationPieChart({
   data,
   title,
   colorMap,
+  currency,
+  centerLabel,
 }: {
   data: Slice[];
   title: string;
   /**
-   * Optional mapping from slice name to fill color. Names found in the map
-   * get their fixed color; names not in the map fall back to the default
-   * palette (deterministic by slice order). Use this when the categorical
-   * meaning of a slice should be visually stable (e.g. risk level =>
-   * green/yellow/red), not rotated based on data ordering.
+   * Fixed color overrides per slice name (e.g. risk level => semantic
+   * green/yellow/red). Names not in the map fall back to the default palette.
    */
   colorMap?: Record<string, string>;
+  /**
+   * If provided, the total of all slices is shown in the donut center
+   * formatted in this currency. If omitted, the center is not rendered.
+   */
+  currency?: Currency;
+  /** Small label shown above the center total (e.g. "总计"). */
+  centerLabel?: string;
 }) {
-  const filtered = data.filter((d) => d.value > 0);
+  const filtered = data
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value); // biggest slice first — chip list reads top-to-bottom
 
   if (filtered.length === 0) return null;
 
-  // Resolve color per slice: explicit override from colorMap wins, otherwise
-  // fall back to the default palette indexed by position among slices that
-  // are NOT already color-mapped, so the fallback sequence stays stable.
-  const fallbackPalette = filtered.map((slice, i) => {
+  const total = filtered.reduce((sum, d) => sum + d.value, 0);
+
+  // Resolve color per slice: explicit colorMap override wins; fallbacks
+  // are indexed by slice position so the color sequence is stable.
+  const sliceColors = filtered.map((slice, i) => {
     if (colorMap?.[slice.name]) return colorMap[slice.name];
-    return COLORS[i % COLORS.length];
+    return DEFAULT_PALETTE[i % DEFAULT_PALETTE.length];
   });
+
+  const showCenter = currency != null;
 
   return (
     <Card>
@@ -101,44 +122,111 @@ export function AllocationPieChart({
         <Card.Title>{title}</Card.Title>
       </Card.Header>
       <Card.Content>
-        <div className="w-full">
-          <ResponsiveContainer width="100%" height={260}>
+        <div className="relative w-full">
+          <ResponsiveContainer width="100%" height={240}>
             <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+              {/* Soft drop shadow applied to the whole donut */}
+              <defs>
+                <filter
+                  id="pie-shadow"
+                  x="-20%"
+                  y="-20%"
+                  width="140%"
+                  height="140%"
+                >
+                  <feDropShadow
+                    dx="0"
+                    dy="2"
+                    stdDeviation="3"
+                    floodColor="#000000"
+                    floodOpacity="0.12"
+                  />
+                </filter>
+              </defs>
               <Pie
                 data={filtered}
                 dataKey="value"
                 nameKey="name"
                 cx="50%"
-                cy="45%"
-                innerRadius={45}
-                outerRadius={80}
+                cy="50%"
+                innerRadius={60}
+                outerRadius={95}
                 paddingAngle={2}
+                cornerRadius={4}
+                stroke="var(--surface)"
+                strokeWidth={2}
                 label={renderInsideLabel}
                 labelLine={false}
-                isAnimationActive={false}
+                filter="url(#pie-shadow)"
+                animationBegin={0}
+                animationDuration={600}
               >
                 {filtered.map((_, i) => (
-                  <Cell key={i} fill={fallbackPalette[i]} />
+                  <Cell key={i} fill={sliceColors[i]} />
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value) =>
-                  Number(value).toLocaleString(undefined, {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                  })
-                }
-              />
-              <Legend
-                verticalAlign="bottom"
-                height={36}
-                iconSize={10}
-                formatter={(value: string) => (
-                  <span className="text-xs text-muted">{value}</span>
-                )}
+                cursor={{ fill: "transparent" }}
+                contentStyle={{
+                  background: "var(--overlay)",
+                  color: "var(--overlay-foreground)",
+                  border: "1px solid var(--separator)",
+                  borderRadius: "var(--radius)",
+                  fontSize: "12px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                  padding: "6px 10px",
+                }}
+                formatter={(value) => [
+                  currency
+                    ? formatCurrency(Number(value), currency)
+                    : Number(value).toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      }),
+                  "",
+                ]}
+                separator=""
               />
             </PieChart>
           </ResponsiveContainer>
+
+          {/* Center total overlay — sits on top of the SVG donut hole */}
+          {showCenter && (
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              {centerLabel && (
+                <span className="text-[11px] text-muted">{centerLabel}</span>
+              )}
+              <span className="text-base font-bold tabular-nums">
+                {formatCurrency(total, currency)}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* HeroUI Chip legend: matches theme, each chip shows a colored dot,
+            the category name, and its percentage. Arranged in a flex wrap
+            so it reflows on narrow screens. */}
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
+          {filtered.map((slice, i) => {
+            const pct = (slice.value / total) * 100;
+            return (
+              <Chip key={slice.name} size="sm" variant="secondary">
+                <span
+                  className="inline-block size-2 rounded-full"
+                  style={{ backgroundColor: sliceColors[i] }}
+                  aria-hidden
+                />
+                <Chip.Label>
+                  <span className="text-xs">
+                    {slice.name}{" "}
+                    <span className="text-muted tabular-nums">
+                      {pct.toFixed(1)}%
+                    </span>
+                  </span>
+                </Chip.Label>
+              </Chip>
+            );
+          })}
         </div>
       </Card.Content>
     </Card>
