@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card, Chip } from "@heroui/react";
 import { DeleteAssetButton } from "@/components/DeleteAssetButton";
 import { AddTransactionForm } from "@/components/AddTransactionForm";
+import { UpdateBalanceForm } from "@/components/UpdateBalanceForm";
 import { EditPriceButton } from "@/components/EditPriceButton";
 import { TransactionList } from "@/components/TransactionList";
 
@@ -100,7 +101,11 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
         </Card.Content>
       </Card>
 
-      <AddTransactionForm assetId={a.id} category={a.category} currency={a.currency} />
+      {inv ? (
+        <AddTransactionForm assetId={a.id} category={a.category} currency={a.currency} />
+      ) : (
+        <UpdateBalanceForm assetId={a.id} currentBalance={balance} currency={a.currency} />
+      )}
 
       <TransactionList transactions={txList} category={a.category} currency={a.currency} />
     </div>
