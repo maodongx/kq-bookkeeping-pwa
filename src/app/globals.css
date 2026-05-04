@@ -131,3 +131,24 @@
 .recharts-tooltip-wrapper {
   font-family: var(--font-sans);
 }
+
+/*
+ * Remove the browser's default focus outline on Recharts pie slice paths.
+ * Recharts makes each <Cell> focusable, so clicking a slice draws a blue
+ * box around it in WebKit/Chrome. We strip the outline on the chart
+ * surfaces specifically — not globally — to preserve keyboard focus
+ * indicators elsewhere in the app.
+ */
+.recharts-wrapper .recharts-pie-sector,
+.recharts-wrapper .recharts-pie-sector:focus,
+.recharts-wrapper .recharts-pie-sector:focus-visible,
+.recharts-wrapper .recharts-sector,
+.recharts-wrapper .recharts-sector:focus,
+.recharts-wrapper .recharts-sector:focus-visible,
+.recharts-wrapper path:focus,
+.recharts-wrapper path:focus-visible {
+  outline: none;
+}
+.recharts-wrapper .recharts-surface {
+  outline: none;
+}
