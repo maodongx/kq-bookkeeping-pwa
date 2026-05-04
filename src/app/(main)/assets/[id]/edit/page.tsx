@@ -3,28 +3,22 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Asset, AssetCategory, AssetTag, RiskLevel, Currency, FundProvider } from "@/lib/types";
-import { CATEGORY_LABELS, CURRENCY_LABELS, TAG_LABELS, RISK_LABELS } from "@/lib/currency";
-import { Card, Button, Input, Label } from "@heroui/react";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Asset } from "@/lib/types";
+import {
+  AssetForm,
+  AssetFormValues,
+  EMPTY_VALUES,
+} from "@/components/AssetForm";
 
 export default function EditAssetPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const supabase = createClient();
 
-  const [asset, setAsset] = useState<Asset | null>(null);
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState<AssetCategory>("usStock");
-  const [currency, setCurrency] = useState<Currency>("USD");
-  const [symbol, setSymbol] = useState("");
-  const [fundProvider, setFundProvider] = useState<FundProvider>("mufg");
-  const [tag, setTag] = useState<AssetTag | "">("");
-  const [riskLevel, setRiskLevel] = useState<RiskLevel | "">("");
-  const [note, setNote] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [initialValues, setInitialValues] =
+    useState<AssetFormValues>(EMPTY_VALUES);
   const [loading, setLoading] = useState(false);
-
-  const isInvestment = category === "usStock" || category === "jpFund" || category === "cnFund";
 
   useEffect(() => {
     async function load() {
@@ -35,34 +29,41 @@ export default function EditAssetPage() {
         .single();
       if (!data) return;
       const a = data as Asset;
-      setAsset(a);
-      setName(a.name);
-      setCategory(a.category);
-      setCurrency(a.currency);
-      setSymbol(a.symbol || "");
-      setFundProvider(a.fund_provider || "mufg");
-      setTag(a.tag || "");
-      setRiskLevel(a.risk_level || "");
-      setNote(a.note || "");
+      setInitialValues({
+        name: a.name,
+        category: a.category,
+        currency: a.currency,
+        symbol: a.symbol || "",
+        fundProvider: a.fund_provider || "mufg",
+        tag: a.tag || "",
+        riskLevel: a.risk_level || "",
+        note: a.note || "",
+        initialBalance: "",
+      });
+      setLoaded(true);
     }
     load();
   }, [params.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(values: AssetFormValues) {
     setLoading(true);
 
     const { error } = await supabase
       .from("assets")
       .update({
-        name: name.trim(),
-        category,
-        currency,
-        symbol: symbol.trim() || null,
-        fund_provider: category === "jpFund" ? fundProvider : category === "cnFund" ? "other" : null,
-        tag: tag || null,
-        risk_level: riskLevel || null,
-        note: note.trim() || null,
+        name: values.name.trim(),
+        category: values.category,
+        currency: values.currency,
+        symbol: values.symbol.trim() || null,
+        fund_provider:
+          values.category === "jpFund"
+            ? values.fundProvider
+            : values.category === "cnFund"
+              ? "other"
+              : null,
+        tag: values.tag || null,
+        risk_level: values.riskLevel || null,
+        note: values.note.trim() || null,
       })
       .eq("id", params.id);
 
@@ -76,127 +77,17 @@ export default function EditAssetPage() {
     router.refresh();
   }
 
-  if (!asset) {
+  if (!loaded) {
     return <div className="p-4 text-sm text-muted">加载中...</div>;
   }
 
   return (
-    <div className="p-4">
-      <h1 className="mb-4 text-xl font-bold">编辑资产</h1>
-      <Card>
-        <Card.Content>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>资产类型</Label>
-              <NativeSelect
-                value={category}
-                onChange={(e) => {
-                  const c = e.target.value as AssetCategory;
-                  setCategory(c);
-                  if (c === "usStock") setCurrency("USD");
-                  if (c === "jpFund") setCurrency("JPY");
-                  if (c === "cnFund") setCurrency("CNY");
-                }}
-              >
-                {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-2">
-              <Label>名称</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-
-            <div className="space-y-2">
-              <Label>币种</Label>
-              <NativeSelect
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value as Currency)}
-              >
-                {Object.entries(CURRENCY_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </NativeSelect>
-            </div>
-
-            {isInvestment && (
-              <div className="space-y-2">
-                <Label>代码</Label>
-                <Input
-                  value={symbol}
-                  onChange={(e) => setSymbol(e.target.value)}
-                  placeholder="如 AAPL"
-                />
-              </div>
-            )}
-
-            {category === "jpFund" && (
-              <div className="space-y-2">
-                <Label>基金公司</Label>
-                <NativeSelect
-                  value={fundProvider}
-                  onChange={(e) => setFundProvider(e.target.value as FundProvider)}
-                >
-                  <option value="mufg">三菱UFJ</option>
-                  <option value="rakuten">乐天证券</option>
-                  <option value="other">其他</option>
-                </NativeSelect>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>标签</Label>
-              <NativeSelect
-                value={tag}
-                onChange={(e) => setTag(e.target.value as AssetTag | "")}
-              >
-                <option value="">无</option>
-                {TAG_LABELS.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-2">
-              <Label>风险等级</Label>
-              <NativeSelect
-                value={riskLevel}
-                onChange={(e) => setRiskLevel(e.target.value as RiskLevel | "")}
-              >
-                <option value="">无</option>
-                {Object.entries(RISK_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-2">
-              <Label>备注</Label>
-              <Input value={note} onChange={(e) => setNote(e.target.value)} />
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onPress={() => router.back()}
-              >
-                取消
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1"
-                isDisabled={loading || !name.trim()}
-              >
-                {loading ? "..." : "保存"}
-              </Button>
-            </div>
-          </form>
-        </Card.Content>
-      </Card>
-    </div>
+    <AssetForm
+      mode="edit"
+      initialValues={initialValues}
+      onSubmit={handleSubmit}
+      onCancel={() => router.back()}
+      submitting={loading}
+    />
   );
 }
