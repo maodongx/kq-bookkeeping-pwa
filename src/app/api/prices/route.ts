@@ -34,37 +34,48 @@ async function fetchMUFGFundPrice(fundCode: string): Promise<number> {
   if (!res.ok) throw new Error(`MUFG API returned ${res.status}`);
 
   const data = await res.json();
-  const price = data?.base_price;
+  const price = data?.datasets?.cfm_base_price;
   if (typeof price !== "number" && typeof price !== "string") {
     throw new Error("Price not found in MUFG response");
   }
   return Number(price);
 }
 
+const BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 async function fetchYahooJPToken(fundCode: string): Promise<string> {
   const pageUrl = `https://finance.yahoo.co.jp/quote/${encodeURIComponent(fundCode)}`;
   const res = await fetch(pageUrl, {
-    headers: { "User-Agent": "Mozilla/5.0" },
+    headers: { "User-Agent": BROWSER_UA },
   });
   if (!res.ok) throw new Error(`Yahoo JP page returned ${res.status}`);
 
   const html = await res.text();
-  const tokenMatch = html.match(/"crumb":"([^"]+)"/);
-  if (!tokenMatch) throw new Error("Could not extract crumb token from Yahoo JP");
+  const tokenMatch = html.match(/"jwtToken":"([^"]+)"/);
+  if (!tokenMatch) throw new Error("Could not extract JWT token from Yahoo JP");
   return tokenMatch[1];
 }
 
 async function fetchRakutenFundPrice(fundCode: string): Promise<number> {
-  const crumb = await fetchYahooJPToken(fundCode);
-  const url = `https://query1.finance.yahoo.co.jp/v8/finance/chart/${encodeURIComponent(fundCode)}?range=1d&interval=1d&crumb=${encodeURIComponent(crumb)}`;
+  const jwt = await fetchYahooJPToken(fundCode);
+  const today = new Date()
+    .toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" })
+    .replace(/-/g, "");
+  const url = `https://finance.yahoo.co.jp/bff-pc/v1/main/fund/chart/history/${encodeURIComponent(fundCode)}?fromDate=&size=2&timeFrame=daily&toDate=${today}`;
   const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0" },
+    headers: { "User-Agent": BROWSER_UA, "jwt-token": jwt },
   });
-  if (!res.ok) throw new Error(`Yahoo JP API returned ${res.status}`);
+  if (!res.ok) throw new Error(`Yahoo JP BFF API returned ${res.status}`);
 
   const data = await res.json();
-  const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-  if (typeof price !== "number") throw new Error("Price not found in Yahoo JP response");
+  const histories = data?.priceHistories;
+  if (!Array.isArray(histories) || histories.length === 0) {
+    throw new Error("No price histories in Yahoo JP response");
+  }
+  const latest = histories[histories.length - 1];
+  const price = latest?.closePrice;
+  if (typeof price !== "number") throw new Error("closePrice not found in Yahoo JP response");
   return price;
 }
 
@@ -96,8 +107,14 @@ export async function POST() {
   }
 
   const { data: assets } = await supabase.from("assets").select("*");
-  const investmentAssets = ((assets || []) as Asset[]).filter(
+  const allAssets = (assets || []) as Asset[];
+  const investmentAssets = allAssets.filter(
     (a) => (a.category === "usStock" || a.category === "jpFund") && a.symbol
+  );
+
+  console.log(
+    `[prices] ${allAssets.length} total assets, ${investmentAssets.length} investment assets:`,
+    investmentAssets.map((a) => `${a.name} (${a.id}, ${a.category}, symbol=${a.symbol}, provider=${a.fund_provider})`)
   );
 
   if (investmentAssets.length === 0) {
@@ -120,8 +137,10 @@ export async function POST() {
     const result = settled[i];
     const asset = investmentAssets[i];
     if (result.status === "fulfilled") {
+      console.log(`[prices] ✓ ${asset.name}: ${result.value.price}`);
       prices.push({ ...result.value, updatedAt: now });
     } else {
+      console.error(`[prices] ✗ ${asset.name} (${asset.id}): ${result.reason?.message}`);
       errors.push({
         assetId: asset.id,
         error: result.reason?.message || "Unknown error",
