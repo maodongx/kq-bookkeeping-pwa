@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { Asset, AssetPriceSnapshot, ExchangeRateSnapshot, Currency, Transaction } from "@/lib/types";
 import { isInvestment } from "@/lib/currency";
 import { fetchLatestRates } from "@/lib/exchange-rates";
-import { computeNetWorthTimeSeries } from "@/lib/chart-utils";
 import { DashboardClient, EnrichedAsset } from "@/components/DashboardClient";
 
 export default async function DashboardPage() {
@@ -29,6 +28,8 @@ export default async function DashboardPage() {
 
   const assetList = (assets || []) as Asset[];
   const txList = (transactions || []) as Transaction[];
+  const pSnaps = (priceSnapshots || []) as AssetPriceSnapshot[];
+  const rSnaps = (rateSnapshots || []) as ExchangeRateSnapshot[];
 
   const lastUpdate = assetList
     .map((a) => a.last_price_update)
@@ -36,6 +37,9 @@ export default async function DashboardPage() {
     .sort()
     .pop() as string | null;
 
+  // Build per-asset enrichment. marketValue and totalCost are kept in the
+  // asset's NATIVE currency so the client can re-convert them into the
+  // currently-selected display currency without having to re-fetch.
   const enriched: EnrichedAsset[] = assetList.map((asset) => {
     const assetTxs = txList.filter((tx) => tx.asset_id === asset.id);
     const inv = isInvestment(asset.category);
@@ -78,30 +82,16 @@ export default async function DashboardPage() {
     };
   });
 
-  const pSnaps = (priceSnapshots || []) as AssetPriceSnapshot[];
-  const rSnaps = (rateSnapshots || []) as ExchangeRateSnapshot[];
-
-  const allTimeSeries = computeNetWorthTimeSeries(
-    assetList, txList, pSnaps, rSnaps, defaultCurrency, "ALL"
-  );
-  const oneMonthSeries = computeNetWorthTimeSeries(
-    assetList, txList, pSnaps, rSnaps, defaultCurrency, "1M"
-  );
-
-  const totalCostAll = enriched.reduce((sum, a) => sum + a.totalCost, 0);
-  const firstPoint = allTimeSeries[0] ?? null;
-  const oneMonthAgoPoint = oneMonthSeries[0] ?? null;
-
   return (
     <DashboardClient
       assets={enriched}
+      rawAssets={assetList}
+      transactions={txList}
+      priceSnapshots={pSnaps}
+      rateSnapshots={rSnaps}
       rates={rates}
       defaultCurrency={defaultCurrency}
       lastUpdate={lastUpdate}
-      totalCost={totalCostAll}
-      firstSnapshotDate={firstPoint?.date ?? null}
-      firstSnapshotNetWorth={firstPoint?.netWorth ?? null}
-      oneMonthAgoNetWorth={oneMonthAgoPoint?.netWorth ?? null}
     />
   );
 }

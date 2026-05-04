@@ -1,10 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Currency, AssetCategory, AssetTag, RiskLevel } from "@/lib/types";
+import {
+  Currency,
+  AssetCategory,
+  AssetTag,
+  RiskLevel,
+  Asset,
+  Transaction,
+  AssetPriceSnapshot,
+  ExchangeRateSnapshot,
+} from "@/lib/types";
 import { formatCurrency, RISK_LABELS } from "@/lib/currency";
 import { RateMap, convertCurrency, totalNetWorth } from "@/lib/exchange-rates";
+import { computeNetWorthTimeSeries } from "@/lib/chart-utils";
 import { refreshAllPrices } from "@/lib/prices";
 import { cn } from "@/lib/utils";
 import { Card } from "@heroui/react";
@@ -28,22 +38,22 @@ export interface EnrichedAsset {
 
 export function DashboardClient({
   assets,
+  rawAssets,
+  transactions,
+  priceSnapshots,
+  rateSnapshots,
   rates,
   defaultCurrency,
   lastUpdate,
-  totalCost,
-  firstSnapshotDate,
-  firstSnapshotNetWorth,
-  oneMonthAgoNetWorth,
 }: {
   assets: EnrichedAsset[];
+  rawAssets: Asset[];
+  transactions: Transaction[];
+  priceSnapshots: AssetPriceSnapshot[];
+  rateSnapshots: ExchangeRateSnapshot[];
   rates: RateMap;
   defaultCurrency: Currency;
   lastUpdate: string | null;
-  totalCost: number;
-  firstSnapshotDate: string | null;
-  firstSnapshotNetWorth: number | null;
-  oneMonthAgoNetWorth: number | null;
 }) {
   const [currency, setCurrency] = useState<Currency>(defaultCurrency);
   const router = useRouter();
@@ -55,18 +65,72 @@ export function DashboardClient({
     refreshAllPrices().then(() => router.refresh());
   }, [router]);
 
+  // Net worth: sum of each asset's marketValue converted from its native
+  // currency into the currently-selected display currency.
   const netWorth = totalNetWorth(assets, currency, rates);
+
+  // Total cost: sum of each asset's cost basis converted into the currently-
+  // selected currency. Using the latest rates is an accepted simplification —
+  // showing gain/loss at "today's rate" for both sides keeps the comparison
+  // self-consistent when the user flips between currencies.
+  const totalCost = useMemo(
+    () =>
+      assets.reduce(
+        (sum, a) => sum + convertCurrency(a.totalCost, a.currency, currency, rates),
+        0
+      ),
+    [assets, currency, rates]
+  );
 
   const totalGain = netWorth - totalCost;
 
-  const monthChange = oneMonthAgoNetWorth != null ? netWorth - oneMonthAgoNetWorth : null;
-  const monthChangePct = oneMonthAgoNetWorth && oneMonthAgoNetWorth > 0
-    ? (monthChange! / oneMonthAgoNetWorth) * 100
-    : null;
+  // Historical net worth series in the SELECTED currency. Recomputed on
+  // every currency switch using the historical rate snapshots so the "近1月"
+  // and "年化" percentages stay meaningful across currency switches.
+  const allTimeSeries = useMemo(
+    () =>
+      computeNetWorthTimeSeries(
+        rawAssets,
+        transactions,
+        priceSnapshots,
+        rateSnapshots,
+        currency,
+        "ALL"
+      ),
+    [rawAssets, transactions, priceSnapshots, rateSnapshots, currency]
+  );
+
+  const oneMonthSeries = useMemo(
+    () =>
+      computeNetWorthTimeSeries(
+        rawAssets,
+        transactions,
+        priceSnapshots,
+        rateSnapshots,
+        currency,
+        "1M"
+      ),
+    [rawAssets, transactions, priceSnapshots, rateSnapshots, currency]
+  );
+
+  const firstPoint = allTimeSeries[0] ?? null;
+  const oneMonthAgoPoint = oneMonthSeries[0] ?? null;
+
+  const firstSnapshotDate = firstPoint?.date ?? null;
+  const firstSnapshotNetWorth = firstPoint?.netWorth ?? null;
+  const oneMonthAgoNetWorth = oneMonthAgoPoint?.netWorth ?? null;
+
+  const monthChange =
+    oneMonthAgoNetWorth != null ? netWorth - oneMonthAgoNetWorth : null;
+  const monthChangePct =
+    oneMonthAgoNetWorth && oneMonthAgoNetWorth > 0
+      ? (monthChange! / oneMonthAgoNetWorth) * 100
+      : null;
 
   let annualizedPct: number | null = null;
   if (firstSnapshotDate && firstSnapshotNetWorth && firstSnapshotNetWorth > 0) {
-    const days = (Date.now() - new Date(firstSnapshotDate).getTime()) / 86400000;
+    const days =
+      (Date.now() - new Date(firstSnapshotDate).getTime()) / 86400000;
     if (days >= 30) {
       const totalReturn = netWorth / firstSnapshotNetWorth;
       annualizedPct = (Math.pow(totalReturn, 365 / days) - 1) * 100;
