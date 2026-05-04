@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Asset, AssetPriceSnapshot, ExchangeRateSnapshot, Currency, Transaction } from "@/lib/types";
-import { isInvestment } from "@/lib/currency";
 import { fetchLatestRates } from "@/lib/exchange-rates";
+import { computeHolding } from "@/lib/asset-calculations";
 import { DashboardClient, EnrichedAsset } from "@/components/DashboardClient";
 
 export default async function DashboardPage() {
@@ -41,32 +41,10 @@ export default async function DashboardPage() {
   // asset's NATIVE currency so the client can re-convert them into the
   // currently-selected display currency without having to re-fetch.
   const enriched: EnrichedAsset[] = assetList.map((asset) => {
-    const assetTxs = txList.filter((tx) => tx.asset_id === asset.id);
-    const inv = isInvestment(asset.category);
-
-    const totalQty = assetTxs.reduce((sum, tx) => {
-      if (tx.type === "buy" || tx.type === "deposit") return sum + tx.quantity;
-      if (tx.type === "sell" || tx.type === "withdraw") return sum - tx.quantity;
-      return sum + tx.quantity;
-    }, 0);
-
-    const totalCost = assetTxs.reduce((sum, tx) => {
-      if (tx.type === "buy") return sum + tx.amount;
-      if (tx.type === "sell") return sum - tx.amount;
-      return sum;
-    }, 0);
-
-    const balance = assetTxs.reduce((sum, tx) => {
-      if (tx.type === "buy" || tx.type === "deposit") return sum + tx.amount;
-      if (tx.type === "sell" || tx.type === "withdraw") return sum - tx.amount;
-      return sum + tx.amount;
-    }, 0);
-
-    const marketValue =
-      inv && asset.current_price ? totalQty * asset.current_price : balance;
-    const gainLoss = inv ? marketValue - totalCost : 0;
-    const gainPct = totalCost > 0 ? (gainLoss / totalCost) * 100 : 0;
-
+    const { totalCost, marketValue, gainLoss, gainPct } = computeHolding(
+      asset,
+      txList
+    );
     return {
       id: asset.id,
       name: asset.name,

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Asset, Transaction } from "@/lib/types";
 import { formatCurrency, CATEGORY_LABELS, RISK_LABELS, isInvestment } from "@/lib/currency";
+import { computeHolding } from "@/lib/asset-calculations";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Card, Chip } from "@heroui/react";
@@ -25,27 +26,8 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
   const a = asset as Asset;
   const inv = isInvestment(a.category);
 
-  const totalQty = txList.reduce((sum, tx) => {
-    if (tx.type === "buy" || tx.type === "deposit") return sum + tx.quantity;
-    if (tx.type === "sell" || tx.type === "withdraw") return sum - tx.quantity;
-    return sum + tx.quantity;
-  }, 0);
-
-  const totalCost = txList.reduce((sum, tx) => {
-    if (tx.type === "buy") return sum + tx.amount;
-    if (tx.type === "sell") return sum - tx.amount;
-    return sum;
-  }, 0);
-
-  const balance = txList.reduce((sum, tx) => {
-    if (tx.type === "buy" || tx.type === "deposit") return sum + tx.amount;
-    if (tx.type === "sell" || tx.type === "withdraw") return sum - tx.amount;
-    return sum + tx.amount;
-  }, 0);
-
-  const marketValue = inv && a.current_price ? totalQty * a.current_price : balance;
-  const gainLoss = inv ? marketValue - totalCost : 0;
-  const gainPct = totalCost > 0 ? (gainLoss / totalCost) * 100 : 0;
+  const { totalQty, totalCost, balance, marketValue, gainLoss, gainPct } =
+    computeHolding(a, txList);
 
   return (
     <div className="space-y-4 p-4">
