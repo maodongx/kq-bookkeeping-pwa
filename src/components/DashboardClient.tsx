@@ -1,41 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import type { SortDescriptor } from "@heroui/react";
 import { Currency, AssetCategory, AssetTag, RiskLevel } from "@/lib/types";
-import { formatCurrency, RISK_LABELS, isInvestment } from "@/lib/currency";
+import { formatCurrency, RISK_LABELS } from "@/lib/currency";
 import { RateMap, convertCurrency, totalNetWorth } from "@/lib/exchange-rates";
 import { refreshAllPrices } from "@/lib/prices";
 import { cn } from "@/lib/utils";
-import { Card, Table } from "@heroui/react";
-import { ChevronUp } from "lucide-react";
+import { Card } from "@heroui/react";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { AllocationPieChart } from "./AllocationPieChart";
 import { RefreshPricesButton } from "./RefreshPricesButton";
-
-function SortHeader({
-  children,
-  direction,
-}: {
-  children: React.ReactNode;
-  direction?: "ascending" | "descending";
-}) {
-  return (
-    <span className="flex items-center gap-1">
-      {children}
-      {!!direction && (
-        <ChevronUp
-          size={14}
-          className={cn(
-            "transition-transform duration-100",
-            direction === "descending" && "rotate-180"
-          )}
-        />
-      )}
-    </span>
-  );
-}
 
 export interface EnrichedAsset {
   id: string;
@@ -56,11 +31,19 @@ export function DashboardClient({
   rates,
   defaultCurrency,
   lastUpdate,
+  totalCost,
+  firstSnapshotDate,
+  firstSnapshotNetWorth,
+  oneMonthAgoNetWorth,
 }: {
   assets: EnrichedAsset[];
   rates: RateMap;
   defaultCurrency: Currency;
   lastUpdate: string | null;
+  totalCost: number;
+  firstSnapshotDate: string | null;
+  firstSnapshotNetWorth: number | null;
+  oneMonthAgoNetWorth: number | null;
 }) {
   const [currency, setCurrency] = useState<Currency>(defaultCurrency);
   const router = useRouter();
@@ -74,34 +57,21 @@ export function DashboardClient({
 
   const netWorth = totalNetWorth(assets, currency, rates);
 
-  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
-    column: "value",
-    direction: "descending",
-  });
+  const totalGain = netWorth - totalCost;
 
-  const sortedAssets = useMemo(() => {
-    return [...assets].sort((a, b) => {
-      let cmp = 0;
-      const col = sortDescriptor.column;
-      if (col === "name") {
-        cmp = a.name.localeCompare(b.name);
-      } else if (col === "value") {
-        const va = convertCurrency(a.marketValue, a.currency, currency, rates);
-        const vb = convertCurrency(b.marketValue, b.currency, currency, rates);
-        cmp = va - vb;
-      } else if (col === "gainLoss") {
-        const ga = isInvestment(a.category)
-          ? convertCurrency(a.gainLoss, a.currency, currency, rates)
-          : -Infinity;
-        const gb = isInvestment(b.category)
-          ? convertCurrency(b.gainLoss, b.currency, currency, rates)
-          : -Infinity;
-        cmp = ga - gb;
-      }
-      if (sortDescriptor.direction === "descending") cmp *= -1;
-      return cmp;
-    });
-  }, [assets, sortDescriptor, currency, rates]);
+  const monthChange = oneMonthAgoNetWorth != null ? netWorth - oneMonthAgoNetWorth : null;
+  const monthChangePct = oneMonthAgoNetWorth && oneMonthAgoNetWorth > 0
+    ? (monthChange! / oneMonthAgoNetWorth) * 100
+    : null;
+
+  let annualizedPct: number | null = null;
+  if (firstSnapshotDate && firstSnapshotNetWorth && firstSnapshotNetWorth > 0) {
+    const days = (Date.now() - new Date(firstSnapshotDate).getTime()) / 86400000;
+    if (days >= 30) {
+      const totalReturn = netWorth / firstSnapshotNetWorth;
+      annualizedPct = (Math.pow(totalReturn, 365 / days) - 1) * 100;
+    }
+  }
 
   const byTag = Object.entries(
     assets.reduce(
@@ -171,82 +141,45 @@ export function DashboardClient({
       )}
 
       {assets.length > 0 && (
-        <Table variant="secondary">
-          <Table.ScrollContainer>
-            <Table.Content
-              aria-label="资产明细"
-              sortDescriptor={sortDescriptor}
-              onSortChange={setSortDescriptor}
-            >
-              <Table.Header>
-                <Table.Column allowsSorting isRowHeader id="name">
-                  {({ sortDirection }) => (
-                    <SortHeader direction={sortDirection}>名称</SortHeader>
-                  )}
-                </Table.Column>
-                <Table.Column allowsSorting id="value">
-                  {({ sortDirection }) => (
-                    <SortHeader direction={sortDirection}>市值</SortHeader>
-                  )}
-                </Table.Column>
-                <Table.Column allowsSorting id="gainLoss">
-                  {({ sortDirection }) => (
-                    <SortHeader direction={sortDirection}>盈亏</SortHeader>
-                  )}
-                </Table.Column>
-              </Table.Header>
-              <Table.Body>
-                {sortedAssets.map((a) => {
-                  const value = convertCurrency(
-                    a.marketValue,
-                    a.currency,
-                    currency,
-                    rates
-                  );
-                  const inv = isInvestment(a.category);
-                  const gain = inv
-                    ? convertCurrency(a.gainLoss, a.currency, currency, rates)
-                    : null;
-                  return (
-                    <Table.Row key={a.id} id={a.id}>
-                      <Table.Cell>
-                        <p className="text-sm font-medium">{a.name}</p>
-                        <p className="text-xs text-muted">
-                          {a.tag || "未分类"}
-                          {a.riskLevel ? ` · ${RISK_LABELS[a.riskLevel]}` : ""}
-                        </p>
-                      </Table.Cell>
-                      <Table.Cell className="text-right tabular-nums text-sm">
-                        {formatCurrency(value, currency)}
-                      </Table.Cell>
-                      <Table.Cell className="text-right tabular-nums text-sm">
-                        {gain !== null ? (
-                          <span
-                            className={cn(
-                              a.gainLoss >= 0
-                                ? "text-red-600"
-                                : "text-green-600"
-                            )}
-                          >
-                            {a.gainLoss >= 0 ? "+" : ""}
-                            {formatCurrency(gain, currency)}
-                            <br />
-                            <span className="text-xs">
-                              ({a.gainPct >= 0 ? "+" : ""}
-                              {a.gainPct.toFixed(2)}%)
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Content>
-          </Table.ScrollContainer>
-        </Table>
+        <div className="grid grid-cols-3 gap-2">
+          <Card className="py-1 text-center">
+            <Card.Content>
+              <p className="text-xs text-muted">累计盈亏</p>
+              <p className={cn(
+                "text-sm font-semibold tabular-nums",
+                totalGain >= 0 ? "text-red-600" : "text-green-600"
+              )}>
+                {formatCurrency(totalGain, currency)}
+              </p>
+            </Card.Content>
+          </Card>
+          <Card className="py-1 text-center">
+            <Card.Content>
+              <p className="text-xs text-muted">近1月</p>
+              <p className={cn(
+                "text-sm font-semibold tabular-nums",
+                monthChangePct != null && monthChangePct >= 0 ? "text-red-600" : "text-green-600"
+              )}>
+                {monthChangePct != null
+                  ? `${monthChangePct >= 0 ? "+" : ""}${monthChangePct.toFixed(2)}%`
+                  : "—"}
+              </p>
+            </Card.Content>
+          </Card>
+          <Card className="py-1 text-center">
+            <Card.Content>
+              <p className="text-xs text-muted">年化</p>
+              <p className={cn(
+                "text-sm font-semibold tabular-nums",
+                annualizedPct != null && annualizedPct >= 0 ? "text-red-600" : "text-green-600"
+              )}>
+                {annualizedPct != null
+                  ? `${annualizedPct >= 0 ? "+" : ""}${annualizedPct.toFixed(2)}%`
+                  : "—"}
+              </p>
+            </Card.Content>
+          </Card>
+        </div>
       )}
 
       <AllocationPieChart data={byTag} title="按标签分配" />

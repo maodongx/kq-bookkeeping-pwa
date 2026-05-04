@@ -1,19 +1,28 @@
 import { createClient } from "@/lib/supabase/server";
-import { Asset, Currency, Transaction } from "@/lib/types";
+import { Asset, AssetPriceSnapshot, ExchangeRateSnapshot, Currency, Transaction } from "@/lib/types";
 import { isInvestment } from "@/lib/currency";
 import { fetchLatestRates } from "@/lib/exchange-rates";
+import { computeNetWorthTimeSeries } from "@/lib/chart-utils";
 import { DashboardClient, EnrichedAsset } from "@/components/DashboardClient";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  const [{ data: assets }, { data: transactions }, rates, { data: { user } }] =
-    await Promise.all([
-      supabase.from("assets").select("*"),
-      supabase.from("transactions").select("*"),
-      fetchLatestRates(supabase),
-      supabase.auth.getUser(),
-    ]);
+  const [
+    { data: assets },
+    { data: transactions },
+    rates,
+    { data: { user } },
+    { data: priceSnapshots },
+    { data: rateSnapshots },
+  ] = await Promise.all([
+    supabase.from("assets").select("*"),
+    supabase.from("transactions").select("*"),
+    fetchLatestRates(supabase),
+    supabase.auth.getUser(),
+    supabase.from("asset_price_snapshots").select("*").order("date"),
+    supabase.from("exchange_rate_snapshots").select("*").order("date"),
+  ]);
 
   const defaultCurrency =
     (user?.user_metadata?.default_currency as Currency) || "USD";
@@ -69,12 +78,30 @@ export default async function DashboardPage() {
     };
   });
 
+  const pSnaps = (priceSnapshots || []) as AssetPriceSnapshot[];
+  const rSnaps = (rateSnapshots || []) as ExchangeRateSnapshot[];
+
+  const allTimeSeries = computeNetWorthTimeSeries(
+    assetList, txList, pSnaps, rSnaps, defaultCurrency, "ALL"
+  );
+  const oneMonthSeries = computeNetWorthTimeSeries(
+    assetList, txList, pSnaps, rSnaps, defaultCurrency, "1M"
+  );
+
+  const totalCostAll = enriched.reduce((sum, a) => sum + a.totalCost, 0);
+  const firstPoint = allTimeSeries[0] ?? null;
+  const oneMonthAgoPoint = oneMonthSeries[0] ?? null;
+
   return (
     <DashboardClient
       assets={enriched}
       rates={rates}
       defaultCurrency={defaultCurrency}
       lastUpdate={lastUpdate}
+      totalCost={totalCostAll}
+      firstSnapshotDate={firstPoint?.date ?? null}
+      firstSnapshotNetWorth={firstPoint?.netWorth ?? null}
+      oneMonthAgoNetWorth={oneMonthAgoPoint?.netWorth ?? null}
     />
   );
 }

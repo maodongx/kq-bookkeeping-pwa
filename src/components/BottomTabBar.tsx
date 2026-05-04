@@ -25,12 +25,12 @@ export function BottomTabBar() {
   return (
     <Tabs
       selectedKey={activeTab}
-      className="fixed inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-50 bg-[#E6E0F8] pb-[env(safe-area-inset-bottom)]"
     >
-      <Tabs.ListContainer className="bg-surface border-t border-separator">
+      <Tabs.ListContainer className="border-t border-separator">
         <Tabs.List
           aria-label="Navigation"
-          className="flex justify-around *:flex-1 *:flex-col *:items-center *:gap-0.5 *:py-2 *:text-xs *:text-muted *:data-[selected=true]:text-accent"
+          className="!bg-[#E6E0F8] flex justify-around *:flex-1 *:flex-col *:items-center *:gap-0.5 *:py-2 *:text-xs *:text-muted *:data-[selected=true]:text-accent"
         >
           {TABS.map((tab) => {
             const Icon = tab.icon;
