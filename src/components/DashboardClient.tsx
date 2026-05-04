@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { SortDescriptor } from "@heroui/react";
 import { Currency, AssetCategory, AssetTag, RiskLevel } from "@/lib/types";
-import { formatCurrency, CATEGORY_LABELS, RISK_LABELS, isInvestment } from "@/lib/currency";
+import { formatCurrency, RISK_LABELS, isInvestment } from "@/lib/currency";
 import { RateMap, convertCurrency, totalNetWorth } from "@/lib/exchange-rates";
 import { refreshAllPrices } from "@/lib/prices";
 import { cn } from "@/lib/utils";
@@ -184,8 +184,6 @@ export function DashboardClient({
                     <SortHeader direction={sortDirection}>名称</SortHeader>
                   )}
                 </Table.Column>
-                <Table.Column id="tag">标签</Table.Column>
-                <Table.Column id="risk">风险</Table.Column>
                 <Table.Column allowsSorting id="value">
                   {({ sortDirection }) => (
                     <SortHeader direction={sortDirection}>市值</SortHeader>
@@ -214,15 +212,9 @@ export function DashboardClient({
                       <Table.Cell>
                         <p className="text-sm font-medium">{a.name}</p>
                         <p className="text-xs text-muted">
-                          {CATEGORY_LABELS[a.category]}
-                          {a.symbol ? ` · ${a.symbol}` : ""}
+                          {a.tag || "未分类"}
+                          {a.riskLevel ? ` · ${RISK_LABELS[a.riskLevel]}` : ""}
                         </p>
-                      </Table.Cell>
-                      <Table.Cell className="text-xs text-muted">
-                        {a.tag || "—"}
-                      </Table.Cell>
-                      <Table.Cell className="text-xs text-muted">
-                        {a.riskLevel ? RISK_LABELS[a.riskLevel] : "—"}
                       </Table.Cell>
                       <Table.Cell className="text-right tabular-nums text-sm">
                         {formatCurrency(value, currency)}

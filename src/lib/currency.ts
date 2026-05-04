@@ -50,7 +50,7 @@ export function isInvestment(category: AssetCategory): boolean {
 }
 
 export const TAG_LABELS: AssetTag[] = [
-  "核心", "成长个股", "成长指数", "收益", "债券", "黄金", "主题", "现金",
+  "个股", "宽基股票基金", "行业股票基金", "债券基金", "黄金", "现金",
 ];
 
 export const RISK_LABELS: Record<RiskLevel, string> = {
