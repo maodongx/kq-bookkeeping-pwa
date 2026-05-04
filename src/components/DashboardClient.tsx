@@ -22,6 +22,21 @@ import { CurrencySwitcher } from "./CurrencySwitcher";
 import { AllocationPieChart } from "./AllocationPieChart";
 import { RefreshPricesButton } from "./RefreshPricesButton";
 
+/**
+ * Fixed color mapping for the risk-level pie chart so the visual meaning
+ * stays stable regardless of slice ordering or which risk buckets exist
+ * in the portfolio on a given day.
+ *   低风险 => green  (safe)
+ *   中风险 => yellow (moderate)
+ *   高风险 => red    (risky)
+ * Assets without a risk level get the default palette via "未分类".
+ */
+const RISK_COLORS: Record<string, string> = {
+  低风险: "#10b981", // emerald-500
+  中风险: "#f59e0b", // amber-500
+  高风险: "#ef4444", // red-500
+};
+
 export interface EnrichedAsset {
   id: string;
   name: string;
@@ -247,7 +262,11 @@ export function DashboardClient({
       )}
 
       <AllocationPieChart data={byTag} title="按标签分配" />
-      <AllocationPieChart data={byRisk} title="按风险等级分配" />
+      <AllocationPieChart
+        data={byRisk}
+        title="按风险等级分配"
+        colorMap={RISK_COLORS}
+      />
     </div>
   );
 }

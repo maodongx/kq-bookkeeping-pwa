@@ -70,13 +70,30 @@ function renderInsideLabel(props: PieLabelProps) {
 export function AllocationPieChart({
   data,
   title,
+  colorMap,
 }: {
   data: Slice[];
   title: string;
+  /**
+   * Optional mapping from slice name to fill color. Names found in the map
+   * get their fixed color; names not in the map fall back to the default
+   * palette (deterministic by slice order). Use this when the categorical
+   * meaning of a slice should be visually stable (e.g. risk level =>
+   * green/yellow/red), not rotated based on data ordering.
+   */
+  colorMap?: Record<string, string>;
 }) {
   const filtered = data.filter((d) => d.value > 0);
 
   if (filtered.length === 0) return null;
+
+  // Resolve color per slice: explicit override from colorMap wins, otherwise
+  // fall back to the default palette indexed by position among slices that
+  // are NOT already color-mapped, so the fallback sequence stays stable.
+  const fallbackPalette = filtered.map((slice, i) => {
+    if (colorMap?.[slice.name]) return colorMap[slice.name];
+    return COLORS[i % COLORS.length];
+  });
 
   return (
     <Card>
@@ -101,7 +118,7 @@ export function AllocationPieChart({
                 isAnimationActive={false}
               >
                 {filtered.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  <Cell key={i} fill={fallbackPalette[i]} />
                 ))}
               </Pie>
               <Tooltip
