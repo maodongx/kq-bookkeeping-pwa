@@ -1,4 +1,4 @@
-const CACHE_NAME = "kq-bookkeeping-v2";
+const CACHE_NAME = "kq-bookkeeping-v3";
 
 const PRECACHE_URLS = ["/", "/login"];
 

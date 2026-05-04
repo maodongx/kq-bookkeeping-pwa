@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#2563eb"/>
-  <text x="256" y="280" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="172" font-weight="700" fill="white">KQ</text>
-  <text x="256" y="375" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="68" fill="rgba(255,255,255,0.8)">记账</text>
-</svg>
