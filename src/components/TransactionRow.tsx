@@ -12,6 +12,7 @@ import {
   isInvestment,
 } from "@/lib/currency";
 import { Button, Input, Separator } from "@heroui/react";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 
 export function TransactionRow({
   tx,
@@ -29,6 +30,7 @@ export function TransactionRow({
   const router = useRouter();
   const supabase = createClient();
   const inv = isInvestment(category);
+  const [confirm, ConfirmDialog] = useConfirmDialog();
 
   const [type, setType] = useState<TransactionType>(tx.type);
   const [quantity, setQuantity] = useState(tx.quantity.toString());
@@ -40,7 +42,13 @@ export function TransactionRow({
   const [deleting, setDeleting] = useState(false);
 
   async function handleDelete() {
-    if (!confirm("确定删除此交易？")) return;
+    const ok = await confirm({
+      heading: "确定删除此交易？",
+      body: "此操作不可恢复。",
+      status: "danger",
+      confirmLabel: "删除",
+    });
+    if (!ok) return;
     setDeleting(true);
     await supabase.from("transactions").delete().eq("id", tx.id);
     router.refresh();
@@ -108,6 +116,7 @@ export function TransactionRow({
           </Button>
         </div>
         <Separator />
+        <ConfirmDialog />
       </form>
     );
   }
@@ -146,6 +155,7 @@ export function TransactionRow({
         </div>
       </div>
       <Separator />
+      <ConfirmDialog />
     </>
   );
 }

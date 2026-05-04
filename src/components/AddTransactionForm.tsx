@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AssetCategory, TransactionType } from "@/lib/types";
 import { getAvailableTxTypes, TX_TYPE_LABELS, isInvestment } from "@/lib/currency";
-import { Card, Button, Input } from "@heroui/react";
+import { Card, Button, Input, toast } from "@heroui/react";
 
 export function AddTransactionForm({
   assetId,
@@ -45,7 +45,7 @@ export function AddTransactionForm({
     });
 
     if (error) {
-      alert(error.message);
+      toast.danger("保存失败", { description: error.message });
     } else {
       setOpen(false);
       setQuantity("");

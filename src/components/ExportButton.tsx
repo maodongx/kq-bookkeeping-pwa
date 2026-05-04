@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { Button } from "@heroui/react";
+import { Button, toast } from "@heroui/react";
 
 export function ExportButton() {
   const [loading, setLoading] = useState(false);
@@ -25,7 +25,9 @@ export function ExportButton() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert("导出失败: " + (e instanceof Error ? e.message : "未知错误"));
+      toast.danger("导出失败", {
+        description: e instanceof Error ? e.message : "未知错误",
+      });
     } finally {
       setLoading(false);
     }

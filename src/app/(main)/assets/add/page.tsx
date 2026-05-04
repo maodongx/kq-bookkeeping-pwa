@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "@heroui/react";
 import {
   AssetForm,
   AssetFormValues,
@@ -37,7 +38,7 @@ export default function AddAssetPage() {
       .single();
 
     if (error || !asset) {
-      alert("添加失败: " + error?.message);
+      toast.danger("添加失败", { description: error?.message });
       setLoading(false);
       return;
     }

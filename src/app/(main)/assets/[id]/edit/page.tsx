@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "@heroui/react";
 import { Asset } from "@/lib/types";
 import {
   AssetForm,
@@ -68,7 +69,7 @@ export default function EditAssetPage() {
       .eq("id", params.id);
 
     if (error) {
-      alert("更新失败: " + error.message);
+      toast.danger("更新失败", { description: error.message });
       setLoading(false);
       return;
     }

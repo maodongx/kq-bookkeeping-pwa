@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Currency } from "@/lib/types";
 import { formatCurrency, CURRENCY_SYMBOLS } from "@/lib/currency";
-import { Card, Button, Input } from "@heroui/react";
+import { Card, Button, Input, toast } from "@heroui/react";
 
 export function UpdateBalanceForm({
   assetId,
@@ -47,7 +47,7 @@ export function UpdateBalanceForm({
     });
 
     if (error) {
-      alert(error.message);
+      toast.danger("保存失败", { description: error.message });
     } else {
       setOpen(false);
       setValue("");
