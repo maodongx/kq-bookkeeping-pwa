@@ -116,3 +116,18 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/*
+ * Recharts renders chart labels as SVG <text>, which do NOT inherit the
+ * HTML font-family. Force SVG text inside Recharts containers to use the
+ * HeroUI theme sans font (Inter via --font-sans). This keeps pie slice
+ * percentage labels, legends, and tooltips visually consistent with the
+ * rest of the UI.
+ */
+.recharts-wrapper text,
+.recharts-wrapper tspan,
+.recharts-text,
+.recharts-legend-item-text,
+.recharts-tooltip-wrapper {
+  font-family: var(--font-sans);
+}
