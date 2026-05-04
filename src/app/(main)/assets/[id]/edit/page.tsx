@@ -5,10 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Asset, AssetCategory, AssetTag, RiskLevel, Currency, FundProvider } from "@/lib/types";
 import { CATEGORY_LABELS, CURRENCY_LABELS, TAG_LABELS, RISK_LABELS } from "@/lib/currency";
-import { Card } from "@heroui/react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, Button, Input, Label } from "@heroui/react";
 import { NativeSelect } from "@/components/ui/native-select";
 
 export default function EditAssetPage() {

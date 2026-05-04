@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Currency } from "@/lib/types";
-import { Card, Separator } from "@heroui/react";
-import { Button } from "@/components/ui/button";
+import { Card, Separator, Button } from "@heroui/react";
 import { CurrencyPreferencePicker } from "@/components/CurrencyPreferencePicker";
 import { ExportButton } from "@/components/ExportButton";
 import { ImportSection } from "@/components/ImportSection";
@@ -51,7 +50,7 @@ export default async function SettingsPage() {
       </Card>
 
       <form action="/api/auth/signout" method="POST">
-        <Button variant="destructive" fullWidth>
+        <Button variant="danger" fullWidth type="submit">
           退出登录
         </Button>
       </form>

@@ -3,11 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { AssetCategory, Currency, TransactionType } from "@/lib/types";
+import { AssetCategory, TransactionType } from "@/lib/types";
 import { getAvailableTxTypes, TX_TYPE_LABELS, isInvestment } from "@/lib/currency";
-import { Card } from "@heroui/react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Card, Button, Input } from "@heroui/react";
 
 export function AddTransactionForm({
   assetId,
@@ -15,7 +13,6 @@ export function AddTransactionForm({
 }: {
   assetId: string;
   category: AssetCategory;
-  currency: Currency;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -81,7 +78,7 @@ export function AddTransactionForm({
                 key={t}
                 type="button"
                 size="sm"
-                variant={type === t ? "default" : "secondary"}
+                variant={type === t ? "primary" : "secondary"}
                 onPress={() => setType(t)}
               >
                 {TX_TYPE_LABELS[t]}

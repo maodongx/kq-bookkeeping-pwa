@@ -11,9 +11,7 @@ import {
   getAvailableTxTypes,
   isInvestment,
 } from "@/lib/currency";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
+import { Button, Input, Separator } from "@heroui/react";
 
 export function TransactionRow({
   tx,
@@ -81,7 +79,7 @@ export function TransactionRow({
               key={t}
               type="button"
               size="sm"
-              variant={type === t ? "default" : "secondary"}
+              variant={type === t ? "primary" : "secondary"}
               onPress={() => setType(t)}
             >
               {TX_TYPE_LABELS[t]}
@@ -137,7 +135,8 @@ export function TransactionRow({
           </div>
           <Button
             variant="ghost"
-            size="icon-xs"
+            size="sm"
+            isIconOnly
             onPress={handleDelete}
             isDisabled={deleting}
             className="text-muted hover:text-danger"

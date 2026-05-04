@@ -3,7 +3,7 @@ import { Asset } from "@/lib/types";
 import { CATEGORY_LABELS, RISK_LABELS } from "@/lib/currency";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { Card, Chip, Link as HeroLink } from "@heroui/react";
+import { Card, Chip } from "@heroui/react";
 
 export default async function AssetsPage() {
   const supabase = await createClient();
@@ -32,9 +32,9 @@ export default async function AssetsPage() {
           <Card.Content>
             <p className="mb-2 text-4xl">📦</p>
             <p className="text-muted">暂无资产</p>
-            <HeroLink href="/assets/add" className="mt-2 inline-block text-sm">
+            <Link href="/assets/add" className="mt-2 inline-block text-sm text-accent underline-offset-4 hover:underline">
               添加第一笔资产 →
-            </HeroLink>
+            </Link>
           </Card.Content>
         </Card>
       ) : (

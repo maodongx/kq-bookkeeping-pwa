@@ -54,7 +54,10 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
           ← 返回
         </Link>
         <div className="flex items-center gap-2">
-          <Link href={`/assets/${a.id}/edit`} className="button button--ghost button--sm">
+          <Link
+            href={`/assets/${a.id}/edit`}
+            className="button button--ghost button--sm"
+          >
             编辑
           </Link>
           <DeleteAssetButton assetId={a.id} />
@@ -104,7 +107,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
       </Card>
 
       {inv ? (
-        <AddTransactionForm assetId={a.id} category={a.category} currency={a.currency} />
+        <AddTransactionForm assetId={a.id} category={a.category} />
       ) : (
         <UpdateBalanceForm assetId={a.id} currentBalance={balance} currency={a.currency} />
       )}

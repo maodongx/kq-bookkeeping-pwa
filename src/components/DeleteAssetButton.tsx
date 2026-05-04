@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
+import { Button } from "@heroui/react";
 
 export function DeleteAssetButton({ assetId }: { assetId: string }) {
   const router = useRouter();
@@ -16,7 +16,7 @@ export function DeleteAssetButton({ assetId }: { assetId: string }) {
   }
 
   return (
-    <Button variant="destructive" size="sm" onPress={handleDelete}>
+    <Button variant="danger" size="sm" onPress={handleDelete}>
       删除
     </Button>
   );

@@ -6,8 +6,7 @@ import { Pencil, Check, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Currency } from "@/lib/types";
 import { formatCurrency } from "@/lib/currency";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button, Input } from "@heroui/react";
 
 export function EditPriceButton({
   assetId,
@@ -77,7 +76,8 @@ export function EditPriceButton({
       />
       <Button
         variant="ghost"
-        size="icon-xs"
+        size="sm"
+        isIconOnly
         onPress={handleSave}
         isDisabled={saving}
         className="text-success"
@@ -86,7 +86,8 @@ export function EditPriceButton({
       </Button>
       <Button
         variant="ghost"
-        size="icon-xs"
+        size="sm"
+        isIconOnly
         onPress={() => setEditing(false)}
       >
         <X />

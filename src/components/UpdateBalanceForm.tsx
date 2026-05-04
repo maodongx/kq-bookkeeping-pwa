@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Currency } from "@/lib/types";
 import { formatCurrency, CURRENCY_SYMBOLS } from "@/lib/currency";
-import { Card } from "@heroui/react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Card, Button, Input } from "@heroui/react";
 
 export function UpdateBalanceForm({
   assetId,

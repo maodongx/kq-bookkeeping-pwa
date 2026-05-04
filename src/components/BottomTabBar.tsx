@@ -40,8 +40,11 @@ export function BottomTabBar() {
                 key={tab.id}
                 id={tab.id}
                 href={tab.id}
-                render={(domProps: any) => (
-                  <Link {...domProps} href={tab.id} />
+                render={(domProps) => (
+                  <Link
+                    {...(domProps as React.ComponentProps<typeof Link>)}
+                    href={tab.id}
+                  />
                 )}
               >
                 <Icon size={22} strokeWidth={isSelected ? 2.2 : 1.8} />

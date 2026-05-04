@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { refreshAllPrices } from "@/lib/prices";
-import { Button } from "@/components/ui/button";
+import { Button } from "@heroui/react";
 
 export function RefreshPricesButton() {
   const [loading, setLoading] = useState(false);
@@ -23,7 +23,8 @@ export function RefreshPricesButton() {
   return (
     <Button
       variant="ghost"
-      size="icon"
+      size="md"
+      isIconOnly
       onPress={handleRefresh}
       isDisabled={loading}
       aria-label="刷新价格"

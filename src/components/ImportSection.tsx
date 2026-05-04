@@ -3,9 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
-import { Tabs } from "@heroui/react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Tabs, Button, Input } from "@heroui/react";
 
 type ImportMode = "merge" | "replace";
 
