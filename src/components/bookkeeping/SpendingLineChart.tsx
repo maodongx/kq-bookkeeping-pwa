@@ -2,6 +2,9 @@
 
 import { Card } from "@heroui/react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { formatCurrency } from "@/lib/currency";
+import { convertCurrency, type RateMap } from "@/lib/exchange-rates";
+import type { Currency } from "@/lib/types";
 import type { SpendingTransaction } from "@/lib/bookkeeping-types";
 
 interface SpendingLineChartProps {
@@ -9,33 +12,42 @@ interface SpendingLineChartProps {
   /** Inclusive YYYY-MM-DD bounds (month start/end in user local time). */
   startDate: string;
   endDate: string;
+  /** User's default currency — the chart's Y axis is expressed in this. */
+  displayCurrency: Currency;
+  /** Rate snapshot for the per-row currency conversion. */
+  rates: RateMap;
 }
 
 /**
  * Bucket transactions by day within [startDate, endDate] and emit one
- * point per day (zero-filled). All date math stays in `YYYY-MM-DD`
- * string space to avoid timezone drift — iterating with a local-time
- * Date but extracting via the helper keeps the two sides consistent
- * with the rest of the app's date convention.
+ * point per day (zero-filled). Each transaction's amount is converted
+ * from its own stored currency into `displayCurrency` before summing,
+ * so a JPY + CNY + USD mix plots correctly on one axis.
+ *
+ * All date math stays in `YYYY-MM-DD` string space to avoid timezone
+ * drift. We iterate with a Date built from the string parts, using
+ * UTC setters so nothing shifts across DST transitions.
  */
 function groupByDay(
   transactions: SpendingTransaction[],
   startDate: string,
-  endDate: string
+  endDate: string,
+  displayCurrency: Currency,
+  rates: RateMap
 ): Array<{ date: string; spending: number }> {
   const dailyTotals = new Map<string, number>();
   for (const tx of transactions) {
     if (tx.date >= startDate && tx.date <= endDate) {
-      dailyTotals.set(
-        tx.date,
-        (dailyTotals.get(tx.date) ?? 0) + tx.amount
+      const converted = convertCurrency(
+        tx.amount,
+        tx.currency,
+        displayCurrency,
+        rates
       );
+      dailyTotals.set(tx.date, (dailyTotals.get(tx.date) ?? 0) + converted);
     }
   }
 
-  // Iterate day-by-day in local time. Parsing "YYYY-MM-DD" with new Date()
-  // treats it as UTC midnight; we reconstruct via getUTC* to stay stable
-  // across DST changes while iterating.
   const result: Array<{ date: string; spending: number }> = [];
   const [startY, startM, startD] = startDate.split("-").map(Number);
   const [endY, endM, endD] = endDate.split("-").map(Number);
@@ -57,8 +69,10 @@ export function SpendingLineChart({
   transactions,
   startDate,
   endDate,
+  displayCurrency,
+  rates,
 }: SpendingLineChartProps) {
-  const data = groupByDay(transactions, startDate, endDate);
+  const data = groupByDay(transactions, startDate, endDate, displayCurrency, rates);
 
   if (data.length < 2) {
     return (
@@ -97,7 +111,7 @@ export function SpendingLineChart({
             />
             <Tooltip
               formatter={(value) => [
-                `¥${Number(value).toLocaleString()}`,
+                formatCurrency(Number(value), displayCurrency),
                 "支出",
               ]}
               labelFormatter={(label) => String(label)}

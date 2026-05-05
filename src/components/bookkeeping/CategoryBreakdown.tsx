@@ -6,6 +6,9 @@ import {
   CATEGORY_ICONS,
   CATEGORY_ICON_FALLBACK,
 } from "@/lib/bookkeeping-data";
+import { formatCurrency } from "@/lib/currency";
+import { convertCurrency, type RateMap } from "@/lib/exchange-rates";
+import type { Currency } from "@/lib/types";
 import type {
   CategorySpendingSummary,
   SpendingTransaction,
@@ -14,6 +17,10 @@ import type {
 interface CategoryBreakdownProps {
   summaries: CategorySpendingSummary[];
   transactions: SpendingTransaction[];
+  /** User's default currency — all amounts are displayed in it. */
+  displayCurrency: Currency;
+  /** Latest rate snapshot, keyed by (base, target). */
+  rates: RateMap;
   /** Fires when the 修改预算 link is tapped for a category header. */
   onEditBudget: (categoryId: string) => void;
   /** Fires when an individual transaction row is tapped. */
@@ -21,17 +28,21 @@ interface CategoryBreakdownProps {
 }
 
 /**
- * Per-category accordion: header shows the rollup (count + total + share%
- * + optional progress bar), expanding reveals every transaction in that
- * category sorted by date desc plus a "修改预算" link at the top. Mirrors
- * the drill-down pattern used on the assets tab.
+ * Per-category accordion: header shows the rollup (total + remaining-
+ * budget % + optional progress bar), expanding reveals every transaction
+ * in that category sorted by date desc plus a "修改预算" link at the top.
+ * Mirrors the drill-down pattern used on the assets tab.
  *
- * Sorted by total spent desc — biggest categories first, matching how
- * users scan for "where did my money go".
+ * All numeric values flow through `convertCurrency` into
+ * `displayCurrency` before rendering — the source rows may be in JPY,
+ * USD, or CNY individually, but the screen always shows one consistent
+ * currency.
  */
 export function CategoryBreakdown({
   summaries,
   transactions,
+  displayCurrency,
+  rates,
   onEditBudget,
   onEditTx,
 }: CategoryBreakdownProps) {
@@ -75,7 +86,7 @@ export function CategoryBreakdown({
                         <AlertTriangle size={14} className="text-warning" />
                       )}
                       <span className="text-sm font-semibold tabular-nums">
-                        ¥{summary.totalSpent.toLocaleString()}
+                        {formatCurrency(summary.totalSpent, displayCurrency)}
                       </span>
                       {budgetLabel && (
                         <span
@@ -106,49 +117,59 @@ export function CategoryBreakdown({
             </Accordion.Heading>
             <Accordion.Panel>
               <Accordion.Body className="p-0">
-                {/* Budget row + edit link */}
+                {/* Budget row + edit link — budget shown in display currency */}
                 <div className="flex items-center justify-between gap-3 border-b border-separator px-3 py-2 text-xs">
                   <span className="text-muted">
                     {summary.budget !== null
-                      ? `预算 ¥${summary.budget.toLocaleString()}`
+                      ? `预算 ${formatCurrency(summary.budget, displayCurrency)}`
                       : "未设预算"}
                   </span>
                   <button
                     type="button"
                     onClick={() => onEditBudget(summary.category.id)}
-                    className="text-accent active:scale-95 transition-transform"
+                    className="text-accent transition-transform active:scale-95"
                   >
                     修改预算
                   </button>
                 </div>
 
-                {/* Transactions — tap to edit */}
+                {/* Transactions — tap to edit. Each amount is converted to
+                    displayCurrency from the row's native currency. */}
                 {txs.length === 0 ? (
                   <p className="px-3 py-4 text-center text-xs text-muted">
                     本月暂无记录
                   </p>
                 ) : (
                   <ul className="divide-y divide-separator">
-                    {txs.map((tx) => (
-                      <li key={tx.id}>
-                        <button
-                          type="button"
-                          onClick={() => onEditTx(tx)}
-                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-default active:bg-default"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm text-foreground">
-                              {tx.notes || <span className="text-muted">—</span>}
-                            </p>
-                            <p className="text-xs text-muted">{tx.date}</p>
-                          </div>
-                          <span className="shrink-0 text-sm font-medium tabular-nums">
-                            {currencySymbol(tx.currency)}
-                            {tx.amount.toLocaleString()}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
+                    {txs.map((tx) => {
+                      const converted = convertCurrency(
+                        tx.amount,
+                        tx.currency,
+                        displayCurrency,
+                        rates
+                      );
+                      return (
+                        <li key={tx.id}>
+                          <button
+                            type="button"
+                            onClick={() => onEditTx(tx)}
+                            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-default active:bg-default"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm text-foreground">
+                                {tx.notes || (
+                                  <span className="text-muted">—</span>
+                                )}
+                              </p>
+                              <p className="text-xs text-muted">{tx.date}</p>
+                            </div>
+                            <span className="shrink-0 text-sm font-medium tabular-nums">
+                              {formatCurrency(converted, displayCurrency)}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </Accordion.Body>
@@ -158,10 +179,6 @@ export function CategoryBreakdown({
       })}
     </Accordion>
   );
-}
-
-function currencySymbol(c: "JPY" | "USD" | "CNY"): string {
-  return c === "USD" ? "$" : "¥";
 }
 
 /**

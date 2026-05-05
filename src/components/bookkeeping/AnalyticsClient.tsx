@@ -16,6 +16,8 @@ import {
   updateSpendingTransaction,
 } from "@/lib/bookkeeping-data";
 import { monthBoundariesLocal } from "@/lib/date";
+import { convertCurrency, type RateMap } from "@/lib/exchange-rates";
+import type { Currency } from "@/lib/types";
 import type {
   CategoryBudget,
   CategorySpendingSummary,
@@ -23,9 +25,19 @@ import type {
   SpendingTransaction,
 } from "@/lib/bookkeeping-types";
 
+/**
+ * Turn raw per-currency rows into per-category summaries normalized to
+ * `displayCurrency`. Every `tx.amount` and `budget.monthlyBudget` passes
+ * through `convertCurrency` so the totals, percentUsed, and the
+ * warning-level computation all compare like-to-like. Without this, a
+ * JPY budget and a CNY transaction would be summed raw and produce
+ * nonsense numbers.
+ */
 function computeSummaries(
   transactions: SpendingTransaction[],
   budgets: CategoryBudget[],
+  displayCurrency: Currency,
+  rates: RateMap,
   dayOfMonth: number,
   daysInMonth: number
 ): CategorySpendingSummary[] {
@@ -33,43 +45,64 @@ function computeSummaries(
   const spendingMap = new Map<string, number>();
 
   for (const tx of transactions) {
+    const converted = convertCurrency(
+      tx.amount,
+      tx.currency,
+      displayCurrency,
+      rates
+    );
     spendingMap.set(
       tx.categoryId,
-      (spendingMap.get(tx.categoryId) ?? 0) + tx.amount
+      (spendingMap.get(tx.categoryId) ?? 0) + converted
     );
   }
 
-  // Return a summary for every category the user has either spent in OR
-  // set a budget for. A category with a budget but no spending yet still
-  // shows up so the user can see "0 / 60,000" progress.
+  // Include categories with either spending OR a budget so the user can
+  // see "0 / 60,000" progress bars even before the first entry of a
+  // month.
   const relevantCategoryIds = new Set<string>([
     ...spendingMap.keys(),
     ...budgetMap.keys(),
   ]);
 
-  return SPENDING_CATEGORIES.filter((cat) => relevantCategoryIds.has(cat.id)).map(
-    (cat) => {
-      const spent = spendingMap.get(cat.id) ?? 0;
-      const budget = budgetMap.get(cat.id);
-      const budgetAmount = budget?.monthlyBudget ?? null;
-      const percentUsed = budgetAmount ? (spent / budgetAmount) * 100 : null;
-      const warningLevel = budgetAmount
-        ? calculateBudgetWarning(spent, budgetAmount, dayOfMonth, daysInMonth)
-        : "none";
+  return SPENDING_CATEGORIES.filter((cat) =>
+    relevantCategoryIds.has(cat.id)
+  ).map((cat) => {
+    const spent = spendingMap.get(cat.id) ?? 0;
+    const budget = budgetMap.get(cat.id);
+    const budgetAmount = budget
+      ? convertCurrency(
+          budget.monthlyBudget,
+          budget.currency,
+          displayCurrency,
+          rates
+        )
+      : null;
+    const percentUsed = budgetAmount ? (spent / budgetAmount) * 100 : null;
+    const warningLevel = budgetAmount
+      ? calculateBudgetWarning(spent, budgetAmount, dayOfMonth, daysInMonth)
+      : "none";
 
-      return {
-        category: cat,
-        totalSpent: spent,
-        budget: budgetAmount,
-        percentUsed,
-        projectedOverspend:
-          warningLevel === "danger" || warningLevel === "warning",
-      };
-    }
-  );
+    return {
+      category: cat,
+      totalSpent: spent,
+      budget: budgetAmount,
+      percentUsed,
+      projectedOverspend:
+        warningLevel === "danger" || warningLevel === "warning",
+    };
+  });
 }
 
-export function AnalyticsClient() {
+interface AnalyticsClientProps {
+  displayCurrency: Currency;
+  rates: RateMap;
+}
+
+export function AnalyticsClient({
+  displayCurrency,
+  rates,
+}: AnalyticsClientProps) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -136,6 +169,8 @@ export function AnalyticsClient() {
   const summaries = computeSummaries(
     transactions,
     budgets,
+    displayCurrency,
+    rates,
     dayOfMonth,
     daysInMonth
   );
@@ -166,7 +201,7 @@ export function AnalyticsClient() {
   const handleUpdateTx = async (entry: {
     categoryId: string;
     amount: number;
-    currency: "JPY" | "USD" | "CNY";
+    currency: Currency;
     date: string;
     notes: string | null;
   }) => {
@@ -241,11 +276,15 @@ export function AnalyticsClient() {
             transactions={transactions}
             startDate={startDate}
             endDate={endDate}
+            displayCurrency={displayCurrency}
+            rates={rates}
           />
           {summaries.length > 0 ? (
             <CategoryBreakdown
               summaries={summaries}
               transactions={transactions}
+              displayCurrency={displayCurrency}
+              rates={rates}
               onEditBudget={handleEditBudget}
               onEditTx={(tx) => setEditingTx(tx)}
             />
