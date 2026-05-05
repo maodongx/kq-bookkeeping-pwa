@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // HeroUI reference docs / demos — vendored for consultation only,
+    // not part of the application. Linting them produces ~70 unrelated
+    // errors that drown out real issues in our code.
+    ".heroui-docs/**",
   ]),
 ]);
 

@@ -64,6 +64,12 @@ export function DashboardClient({
   const router = useRouter();
   const hasRefreshed = useRef(false);
 
+  // Capture "now" once at mount. Using a useState initializer keeps this
+  // pure from React's POV (the impure Date.now() is invoked by React's
+  // state setup, not by render), so the annualized calculation below is
+  // stable across re-renders even when we re-compute memoized values.
+  const [nowMs] = useState(() => Date.now());
+
   useEffect(() => {
     if (hasRefreshed.current) return;
     hasRefreshed.current = true;
@@ -135,7 +141,7 @@ export function DashboardClient({
   let annualizedPct: number | null = null;
   if (firstSnapshotDate && firstSnapshotNetWorth && firstSnapshotNetWorth > 0) {
     const days =
-      (Date.now() - new Date(firstSnapshotDate).getTime()) / 86400000;
+      (nowMs - new Date(firstSnapshotDate).getTime()) / 86400000;
     if (days >= 30) {
       const totalReturn = netWorth / firstSnapshotNetWorth;
       annualizedPct = (Math.pow(totalReturn, 365 / days) - 1) * 100;
