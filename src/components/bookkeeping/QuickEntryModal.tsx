@@ -9,9 +9,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from "@heroui/react";
-import { NumericKeypad } from "./NumericKeypad";
 import { todayLocal } from "@/lib/date";
-import { CURRENCY_SYMBOLS } from "@/lib/currency";
 import type { Currency } from "@/lib/types";
 import type { SpendingCategory } from "@/lib/bookkeeping-types";
 
@@ -31,17 +29,23 @@ interface QuickEntryModalProps {
 const CURRENCIES: Currency[] = ["JPY", "USD", "CNY"];
 
 /**
- * Spending entry modal. Layout top-to-bottom:
+ * Spending entry modal. Native number input instead of a custom keypad —
+ * iPhone surfaces its system numeric keyboard for `type="number"` +
+ * `inputMode="decimal"`, which takes less screen real-estate than a
+ * rendered keypad and feels more native.
  *
- *   备注: [_______________]          ← notes (compact, at top)
- *   [JPY|USD|CNY]       ¥ 1,234      ← currency picker + amount readout
- *   ┌───┬───┬───┐
- *   │ 7 │ 8 │ 9 │
- *   │ 4 │ 5 │ 6 │                    ← phone-dialer keypad
- *   │ 1 │ 2 │ 3 │
- *   │ . │ 0 │ ⌫ │
- *   └───┴───┴───┘
- *   [date]   [  确认  ]              ← bottom row
+ * Layout top-to-bottom:
+ *
+ *   [备注（可选）______________]
+ *                [JPY|USD|CNY]          ← centered
+ *   价格     [0________________]
+ *   [date]                   [确认]
+ *
+ * All Inputs opt into the `input-flat` helper class (defined in
+ * globals.css) which suppresses HeroUI's default focus ring. Users
+ * tapping between fields in a tight modal found the accent-colored
+ * ring visually heavy; rely on the cursor for focus indication
+ * instead.
  */
 export function QuickEntryModal({
   category,
@@ -64,10 +68,11 @@ export function QuickEntryModal({
   };
 
   const handleConfirm = () => {
-    if (!category || !amount || parseFloat(amount) === 0) return;
+    const numeric = parseFloat(amount);
+    if (!category || !isFinite(numeric) || numeric <= 0) return;
     onSave({
       categoryId: category.id,
-      amount: parseFloat(amount),
+      amount: numeric,
       currency,
       date,
       notes: notes.trim() || null,
@@ -81,8 +86,7 @@ export function QuickEntryModal({
     onClose();
   };
 
-  const canConfirm =
-    !!amount && amount !== "0" && amount !== "." && amount !== "0.";
+  const canConfirm = parseFloat(amount) > 0;
 
   return (
     <Modal.Backdrop
@@ -92,25 +96,24 @@ export function QuickEntryModal({
       }}
     >
       <Modal.Container>
-        <Modal.Dialog className="sm:max-w-[420px]">
+        <Modal.Dialog className="sm:max-w-[400px]">
           <Modal.CloseTrigger />
           <Modal.Header>
             <Modal.Heading>{category?.name}</Modal.Heading>
           </Modal.Header>
           <Modal.Body>
-            <div className="flex flex-col gap-3">
-              {/* Notes — compact single-line input at the top */}
+            <div className="flex flex-col gap-4">
+              {/* Notes — compact single-line input */}
               <Input
                 placeholder="备注（可选）"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 variant="secondary"
+                className="input-flat"
               />
 
-              {/* Currency picker + amount readout — same row, opposite sides.
-                  ToggleButtonGroup matches the pattern used by CurrencySwitcher
-                  on the dashboard so the two stay visually consistent. */}
-              <div className="flex items-center justify-between gap-2 py-1">
+              {/* Currency switcher, centered */}
+              <div className="flex justify-center">
                 <ToggleButtonGroup
                   aria-label="货币"
                   selectionMode="single"
@@ -128,14 +131,23 @@ export function QuickEntryModal({
                     </ToggleButton>
                   ))}
                 </ToggleButtonGroup>
-                <div className="text-right text-4xl font-semibold tabular-nums">
-                  {CURRENCY_SYMBOLS[currency]}
-                  {amount || "0"}
-                </div>
               </div>
 
-              {/* Numeric keypad */}
-              <NumericKeypad value={amount} onChange={setAmount} />
+              {/* Price — inline label + number input */}
+              <div className="flex items-center gap-3">
+                <span className="shrink-0 text-sm text-muted">价格</span>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min={0}
+                  placeholder="0"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  variant="secondary"
+                  className="input-flat flex-1"
+                />
+              </div>
 
               {/* Date + Confirm — share the bottom row */}
               <div className="flex items-center gap-2 pt-1">
@@ -144,11 +156,10 @@ export function QuickEntryModal({
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   variant="secondary"
-                  className="flex-1"
+                  className="input-flat flex-1"
                 />
                 <Button
                   variant="primary"
-                  size="lg"
                   onPress={handleConfirm}
                   isDisabled={!canConfirm}
                 >

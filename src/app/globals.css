@@ -115,6 +115,28 @@
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
+
+  /*
+   * Opt-in helper for Inputs that want to suppress HeroUI's default focus
+   * ring and border-color change. HeroUI's base `.input` class applies
+   * `@apply status-focused-field` plus a border-color-focus swap on focus,
+   * which on a cramped modal area (e.g. the quick-entry spending form)
+   * visually dominated whichever field had focus and made the card feel
+   * busy. Using this class preserves the component's structural styling
+   * (background, border-radius, padding) while keeping focused fields
+   * visually quiet — the caret is the focus indicator.
+   *
+   * Use sparingly; on full-page forms the ring gives useful a11y
+   * feedback.
+   */
+  .input-flat:focus,
+  .input-flat[data-focused="true"],
+  .input-flat:focus-visible,
+  .input-flat[data-focus-visible="true"] {
+    box-shadow: none;
+    border-color: var(--color-field-border);
+    background-color: var(--input-bg, var(--color-field-background));
+  }
 }
 
 /*
