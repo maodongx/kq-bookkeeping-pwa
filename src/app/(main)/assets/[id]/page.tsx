@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Asset, Transaction } from "@/lib/types";
-import { formatCurrency, CATEGORY_LABELS, RISK_LABELS, isInvestment, gainLossTextClass } from "@/lib/currency";
+import { formatCurrency, CATEGORY_LABELS, RISK_LABELS, isInvestment, hasPerAssetGainLoss, gainLossTextClass } from "@/lib/currency";
 import { computeHolding } from "@/lib/asset-calculations";
 import Link from "next/link";
 import { Card, Chip } from "@heroui/react";
@@ -78,7 +78,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
             label={inv ? "市值" : "余额"}
             value={formatCurrency(marketValue, a.currency)}
           />
-          {inv && (
+          {hasPerAssetGainLoss(a.category) && (
             <LabelValueRow
               label="盈亏"
               value={`${formatCurrency(gainLoss, a.currency)} (${gainLoss >= 0 ? "+" : ""}${gainPct.toFixed(2)}%)`}
@@ -88,9 +88,16 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
         </Card.Content>
       </Card>
 
-      {inv ? (
+      {hasPerAssetGainLoss(a.category) ? (
+        // Investments (buy/sell) and mmf/managed (deposit/withdraw/adjustment)
+        // both use AddTransactionForm. For mmf/managed this is important:
+        // the form lets the user explicitly pick deposit (new capital) vs
+        // adjustment (NAV update / interest), so a paycheck arriving is not
+        // silently classified as market gain.
         <AddTransactionForm assetId={a.id} category={a.category} />
       ) : (
+        // Bank / cash / other — quick "set current balance" UX. Creates an
+        // adjustment; users treat this as the running balance for daily use.
         <UpdateBalanceForm assetId={a.id} currentBalance={balance} currency={a.currency} />
       )}
 

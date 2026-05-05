@@ -1,5 +1,5 @@
 import { Asset, Transaction, AssetPriceSnapshot, ExchangeRateSnapshot, Currency } from "./types";
-import { isInvestment } from "./currency";
+import { hasPerAssetGainLoss, isInvestment } from "./currency";
 import { RateMap, convertCurrency } from "./exchange-rates";
 import { computeHolding } from "./asset-calculations";
 export type TimeRange = "1W" | "1M" | "3M" | "6M" | "1Y" | "ALL";
@@ -139,7 +139,7 @@ export function computeGainLossPerAsset(
   rates: RateMap
 ): GainLossItem[] {
   return assets
-    .filter((a) => isInvestment(a.category))
+    .filter((a) => hasPerAssetGainLoss(a.category))
     .map((asset) => {
       // Delegate to the canonical holding math so the bar chart and the
       // per-asset detail page can never disagree about gain/loss.

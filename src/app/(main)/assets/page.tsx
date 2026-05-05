@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Asset, AssetCategory, Currency, Transaction } from "@/lib/types";
-import { isInvestment } from "@/lib/currency";
+import { hasPerAssetGainLoss } from "@/lib/currency";
 import { computeHolding } from "@/lib/asset-calculations";
 import { convertCurrency, fetchLatestRates } from "@/lib/exchange-rates";
 import { AssetsClient, CategoryGroup } from "@/components/AssetsClient";
@@ -14,6 +14,8 @@ const CATEGORY_ORDER: AssetCategory[] = [
   "usStock",
   "jpFund",
   "cnFund",
+  "mmf",
+  "managed",
   "bankDeposit",
   "cash",
   "other",
@@ -48,7 +50,7 @@ export default async function AssetsPage() {
   const groupMap = new Map<AssetCategory, CategoryGroup>();
   for (const asset of assetList) {
     const { marketValue, gainLoss, gainPct } = computeHolding(asset, txList);
-    const inv = isInvestment(asset.category);
+    const showGain = hasPerAssetGainLoss(asset.category);
 
     const row = {
       id: asset.id,
@@ -62,10 +64,10 @@ export default async function AssetsPage() {
         displayCurrency,
         rates
       ),
-      gainLossInDisplay: inv
+      gainLossInDisplay: showGain
         ? convertCurrency(gainLoss, asset.currency, displayCurrency, rates)
         : null,
-      gainPct: inv ? gainPct : null,
+      gainPct: showGain ? gainPct : null,
     };
 
     let group = groupMap.get(asset.category);

@@ -15,6 +15,8 @@ export const CATEGORY_LABELS: Record<AssetCategory, string> = {
   usStock: "美股",
   jpFund: "日本基金",
   cnFund: "中国基金",
+  mmf: "货币基金",
+  managed: "委托理财",
   bankDeposit: "银行存款",
   cash: "现金",
   other: "其他",
@@ -47,6 +49,25 @@ export function getAvailableTxTypes(category: AssetCategory): TransactionType[] 
 
 export function isInvestment(category: AssetCategory): boolean {
   return category === "usStock" || category === "jpFund" || category === "cnFund";
+}
+
+/**
+ * True for categories that have a meaningful per-asset gain/loss figure.
+ *
+ * This is a strict superset of `isInvestment`:
+ *   - isInvestment (usStock/jpFund/cnFund): buy-sell model, gainLoss =
+ *     marketValue - totalCost (quantity × current_price less cost basis).
+ *   - mmf / managed: balance-tracking model with no external price, gainLoss =
+ *     balance - (deposits − withdraws). Users log the current NAV via
+ *     `adjustment` transactions, which the capital-flows model already
+ *     treats as market effect rather than new capital.
+ *
+ * bankDeposit / cash / other return false — if a user wants interest tracked
+ * per-asset for a bank account, we can revisit, but today that gain only
+ * shows up on the dashboard's cross-asset `累计盈亏`, not per-asset.
+ */
+export function hasPerAssetGainLoss(category: AssetCategory): boolean {
+  return isInvestment(category) || category === "mmf" || category === "managed";
 }
 
 export const TAG_LABELS: AssetTag[] = [
