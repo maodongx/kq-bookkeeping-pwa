@@ -183,6 +183,56 @@ export async function upsertCategoryBudget(
 export type BudgetWarningLevel = "none" | "caution" | "warning" | "danger";
 
 /**
+ * Return up to `limit` most-used note keywords for a category. "Most used"
+ * is measured over the last 200 transactions in that category to bound
+ * the work; groups similar notes together (case-insensitive, trimmed) so
+ * `Starbucks`, `starbucks`, and ` Starbucks ` count as the same keyword
+ * when ranking. The display form returned is whichever exact string the
+ * user typed most recently for that canonical key — feels less like a
+ * spell-corrector and more like "quick reuse of what I just typed".
+ *
+ * Fetched on modal open, so every new save is reflected the next time the
+ * user opens an entry for that category. No caching, no aggregate table.
+ */
+export async function getTopNotesForCategory(
+  categoryId: string,
+  limit = 5
+): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("spending_transactions")
+    .select("notes, created_at")
+    .eq("category_id", categoryId)
+    .not("notes", "is", null)
+    .neq("notes", "")
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (error) throw error;
+
+  // Rows arrive most-recent-first. The first time we see each canonical
+  // key we store that raw form as the display string, and count any later
+  // variants as the same group.
+  const groups = new Map<string, { count: number; display: string }>();
+  for (const row of data ?? []) {
+    const raw = typeof row.notes === "string" ? row.notes.trim() : "";
+    if (!raw) continue;
+    const key = raw.toLowerCase();
+    const existing = groups.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      groups.set(key, { count: 1, display: raw });
+    }
+  }
+
+  return [...groups.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+    .map((g) => g.display);
+}
+
+/**
  * Classify budget health by projecting current pace to month end.
  *  - `danger`  — already over, OR projected to exceed 100%.
  *  - `warning` — projected to hit 80%-100%.

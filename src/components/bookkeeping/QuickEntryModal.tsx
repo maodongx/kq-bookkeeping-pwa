@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Key } from "@heroui/react";
 import {
   Button,
+  Chip,
   Input,
   Modal,
   ToggleButton,
   ToggleButtonGroup,
 } from "@heroui/react";
 import { todayLocal } from "@/lib/date";
+import { getTopNotesForCategory } from "@/lib/bookkeeping-data";
 import type { Currency } from "@/lib/types";
 import type { SpendingCategory } from "@/lib/bookkeeping-types";
 
@@ -59,12 +61,37 @@ export function QuickEntryModal({
   // Default to JPY — daily spending in Japan is almost always yen. Users
   // who pay in USD or CNY can flip per-entry via the toggle.
   const [currency, setCurrency] = useState<Currency>("JPY");
+  // Top 5 recently-used notes for this category, shown as tappable chips.
+  // Re-fetched on every modal open so new entries reshape the ranking.
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  // Capture just the id so the effect's deps array doesn't depend on the
+  // whole category object (which would refire if the parent passed a new
+  // reference for the same category). Resetting suggestions back to []
+  // is handled by reset() on close/confirm, not here — React Compiler
+  // forbids sync state writes at effect-setup time.
+  const categoryId = category?.id ?? null;
+  useEffect(() => {
+    if (!isOpen || !categoryId) return;
+    let cancelled = false;
+    getTopNotesForCategory(categoryId, 5)
+      .then((top) => {
+        if (!cancelled) setSuggestions(top);
+      })
+      .catch(() => {
+        // Non-fatal — just no suggestions. The user can still type freely.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, categoryId]);
 
   const reset = () => {
     setAmount("");
     setNotes("");
     setDate(todayLocal());
     setCurrency("JPY");
+    setSuggestions([]);
   };
 
   const handleConfirm = () => {
@@ -111,6 +138,26 @@ export function QuickEntryModal({
                 variant="secondary"
                 className="input-flat"
               />
+
+              {/* Quick-fill chips: top 5 most-used notes for this category.
+                  Tap to prefill; user can still edit afterwards. */}
+              {suggestions.length > 0 && (
+                <div className="-mt-2 flex flex-wrap gap-2">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setNotes(s)}
+                      className="transition-transform active:scale-95"
+                      aria-label={`使用备注 ${s}`}
+                    >
+                      <Chip variant="tertiary" size="sm">
+                        {s}
+                      </Chip>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Currency switcher, centered */}
               <div className="flex justify-center">
