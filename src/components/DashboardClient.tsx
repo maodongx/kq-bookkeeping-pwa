@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Asset,
@@ -28,6 +28,18 @@ function fmtPct(pct: number | null): string {
   return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`;
 }
 
+/**
+ * Auto-refresh throttle: once the user has kicked off an external price
+ * fetch, don't fire it again until the cooldown elapses. Without this the
+ * dashboard re-hits Yahoo / MUFG / Tiantian / open.er-api.com every time
+ * the user tabs back to /, which caused a ~1-2s re-paint and made tab
+ * navigation feel sluggish. The key lives in sessionStorage so the
+ * throttle survives client-side route changes (including strict-mode
+ * double-invokes in dev) but resets when the tab closes.
+ */
+const REFRESH_COOLDOWN_KEY = "kq:last-price-refresh";
+const REFRESH_COOLDOWN_MS = 25 * 60 * 1000;
+
 export function DashboardClient({
   assets,
   rawAssets,
@@ -50,13 +62,15 @@ export function DashboardClient({
   const [currency, setCurrency] = useState<Currency>(defaultCurrency);
   const router = useRouter();
 
-  // Refresh prices once per mount. The ref guards against React strict
-  // mode's double-invoke in dev, which would otherwise hit the external
-  // price and rate APIs twice on every reload.
-  const hasRefreshed = useRef(false);
   useEffect(() => {
-    if (hasRefreshed.current) return;
-    hasRefreshed.current = true;
+    if (typeof window === "undefined") return;
+    const last = Number(
+      window.sessionStorage.getItem(REFRESH_COOLDOWN_KEY) ?? 0
+    );
+    if (Date.now() - last < REFRESH_COOLDOWN_MS) return;
+    // Set the timestamp before firing so strict-mode double-invokes and
+    // rapid re-renders both see the cooldown and bail out.
+    window.sessionStorage.setItem(REFRESH_COOLDOWN_KEY, String(Date.now()));
     refreshAllPrices().then(() => router.refresh());
   }, [router]);
 
