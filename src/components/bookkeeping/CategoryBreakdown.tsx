@@ -36,7 +36,6 @@ export function CategoryBreakdown({
   onEditTx,
 }: CategoryBreakdownProps) {
   const sorted = [...summaries].sort((a, b) => b.totalSpent - a.totalSpent);
-  const total = sorted.reduce((sum, s) => sum + s.totalSpent, 0);
 
   // Group transactions by category once and sort each group date desc.
   const txByCategory = new Map<string, SpendingTransaction[]>();
@@ -54,8 +53,11 @@ export function CategoryBreakdown({
       {sorted.map((summary) => {
         const IconComponent =
           CATEGORY_ICONS[summary.category.icon] ?? CATEGORY_ICON_FALLBACK;
-        const percentage = total > 0 ? (summary.totalSpent / total) * 100 : 0;
         const txs = txByCategory.get(summary.category.id) ?? [];
+        // Budget-relative percentage: how much of the monthly allowance is
+        // left for this category. Null when no budget is set; positive
+        // "剩余 X%" when under, "超支 X%" when over.
+        const budgetLabel = budgetRelativeLabel(summary.percentUsed);
         return (
           <Accordion.Item key={summary.category.id} id={summary.category.id}>
             <Accordion.Heading>
@@ -68,9 +70,6 @@ export function CategoryBreakdown({
                     <span className="flex-1 truncate text-left text-sm font-semibold text-foreground">
                       {summary.category.name}
                     </span>
-                    <span className="text-xs text-muted">
-                      {txs.length}笔
-                    </span>
                     <div className="flex items-center gap-1">
                       {summary.projectedOverspend && (
                         <AlertTriangle size={14} className="text-warning" />
@@ -78,9 +77,17 @@ export function CategoryBreakdown({
                       <span className="text-sm font-semibold tabular-nums">
                         ¥{summary.totalSpent.toLocaleString()}
                       </span>
-                      <span className="ml-1 text-xs font-normal text-muted">
-                        ({percentage.toFixed(1)}%)
-                      </span>
+                      {budgetLabel && (
+                        <span
+                          className={`ml-1 text-xs font-normal ${
+                            budgetLabel.overBudget
+                              ? "text-warning"
+                              : "text-muted"
+                          }`}
+                        >
+                          ({budgetLabel.text})
+                        </span>
+                      )}
                     </div>
                   </div>
                   {summary.budget !== null && summary.percentUsed !== null && (
@@ -155,4 +162,28 @@ export function CategoryBreakdown({
 
 function currencySymbol(c: "JPY" | "USD" | "CNY"): string {
   return c === "USD" ? "$" : "¥";
+}
+
+/**
+ * Given percentUsed (0-100 typically, can exceed 100 when over budget),
+ * produce the label shown next to a category's total in the header.
+ *   - Null percentUsed → null (no budget set, nothing to show)
+ *   - 0-100 → "剩余 X%" (under budget: X = 100 - percentUsed)
+ *   - >100  → "超支 X%" (over budget:  X = percentUsed - 100)
+ * `overBudget` is returned separately so the caller can color the span.
+ */
+function budgetRelativeLabel(
+  percentUsed: number | null
+): { text: string; overBudget: boolean } | null {
+  if (percentUsed == null) return null;
+  if (percentUsed > 100) {
+    return {
+      text: `超支 ${(percentUsed - 100).toFixed(1)}%`,
+      overBudget: true,
+    };
+  }
+  return {
+    text: `剩余 ${(100 - percentUsed).toFixed(1)}%`,
+    overBudget: false,
+  };
 }
