@@ -1,44 +1,33 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Currency,
-  AssetCategory,
-  AssetTag,
-  RiskLevel,
   Asset,
-  Transaction,
   AssetPriceSnapshot,
+  Currency,
   ExchangeRateSnapshot,
+  Transaction,
 } from "@/lib/types";
-import { formatCurrency, RISK_LABELS, RISK_COLORS, gainLossTextClass } from "@/lib/currency";
-import { RateMap, convertCurrency, totalNetWorth } from "@/lib/exchange-rates";
-import { computeNetWorthTimeSeries } from "@/lib/chart-utils";
+import { formatCurrency, RISK_COLORS, gainLossTextClass } from "@/lib/currency";
+import { RateMap } from "@/lib/exchange-rates";
 import { refreshAllPrices } from "@/lib/prices";
+import {
+  DashboardAsset,
+  computeDashboardStats,
+} from "@/lib/dashboard-stats";
 import { Card } from "@heroui/react";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { AllocationPieChart } from "./AllocationPieChart";
 import { RefreshPricesButton } from "./RefreshPricesButton";
 import { StatCard } from "./StatCard";
 
-/**
- * Risk-level palette lives in lib/currency.ts as RISK_COLORS so that any
- * future badge or chip that shows a risk level agrees with this chart.
- */
+export type { DashboardAsset } from "@/lib/dashboard-stats";
 
-export interface EnrichedAsset {
-  id: string;
-  name: string;
-  category: AssetCategory;
-  currency: Currency;
-  symbol: string | null;
-  tag: AssetTag | null;
-  riskLevel: RiskLevel | null;
-  marketValue: number;
-  totalCost: number;
-  gainLoss: number;
-  gainPct: number;
+/** "+3.21%", "-1.05%", or "—" when the percentage is not available. */
+function fmtPct(pct: number | null): string {
+  if (pct == null) return "—";
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`;
 }
 
 export function DashboardClient({
@@ -51,7 +40,7 @@ export function DashboardClient({
   defaultCurrency,
   lastUpdate,
 }: {
-  assets: EnrichedAsset[];
+  assets: DashboardAsset[];
   rawAssets: Asset[];
   transactions: Transaction[];
   priceSnapshots: AssetPriceSnapshot[];
@@ -62,117 +51,32 @@ export function DashboardClient({
 }) {
   const [currency, setCurrency] = useState<Currency>(defaultCurrency);
   const router = useRouter();
+
+  // Refresh prices once per mount. The ref guards against React strict
+  // mode's double-invoke in dev, which would otherwise hit the external
+  // price and rate APIs twice on every reload.
   const hasRefreshed = useRef(false);
-
-  // Capture "now" once at mount. Using a useState initializer keeps this
-  // pure from React's POV (the impure Date.now() is invoked by React's
-  // state setup, not by render), so the annualized calculation below is
-  // stable across re-renders even when we re-compute memoized values.
-  const [nowMs] = useState(() => Date.now());
-
   useEffect(() => {
     if (hasRefreshed.current) return;
     hasRefreshed.current = true;
     refreshAllPrices().then(() => router.refresh());
   }, [router]);
 
-  // Net worth: sum of each asset's marketValue converted from its native
-  // currency into the currently-selected display currency.
-  const netWorth = totalNetWorth(assets, currency, rates);
-
-  // Total cost: sum of each asset's cost basis converted into the currently-
-  // selected currency. Using the latest rates is an accepted simplification —
-  // showing gain/loss at "today's rate" for both sides keeps the comparison
-  // self-consistent when the user flips between currencies.
-  const totalCost = useMemo(
+  const stats = useMemo(
     () =>
-      assets.reduce(
-        (sum, a) => sum + convertCurrency(a.totalCost, a.currency, currency, rates),
-        0
-      ),
-    [assets, currency, rates]
-  );
-
-  const totalGain = netWorth - totalCost;
-
-  // Historical net worth series in the SELECTED currency. Recomputed on
-  // every currency switch using the historical rate snapshots so the "近1月"
-  // and "年化" percentages stay meaningful across currency switches.
-  const allTimeSeries = useMemo(
-    () =>
-      computeNetWorthTimeSeries(
+      computeDashboardStats({
+        assets,
         rawAssets,
         transactions,
         priceSnapshots,
         rateSnapshots,
+        rates,
         currency,
-        "ALL"
-      ),
-    [rawAssets, transactions, priceSnapshots, rateSnapshots, currency]
+      }),
+    [assets, rawAssets, transactions, priceSnapshots, rateSnapshots, rates, currency]
   );
 
-  const oneMonthSeries = useMemo(
-    () =>
-      computeNetWorthTimeSeries(
-        rawAssets,
-        transactions,
-        priceSnapshots,
-        rateSnapshots,
-        currency,
-        "1M"
-      ),
-    [rawAssets, transactions, priceSnapshots, rateSnapshots, currency]
-  );
-
-  const firstPoint = allTimeSeries[0] ?? null;
-  const oneMonthAgoPoint = oneMonthSeries[0] ?? null;
-
-  const firstSnapshotDate = firstPoint?.date ?? null;
-  const firstSnapshotNetWorth = firstPoint?.netWorth ?? null;
-  const oneMonthAgoNetWorth = oneMonthAgoPoint?.netWorth ?? null;
-
-  const monthChange =
-    oneMonthAgoNetWorth != null ? netWorth - oneMonthAgoNetWorth : null;
-  const monthChangePct =
-    oneMonthAgoNetWorth && oneMonthAgoNetWorth > 0
-      ? (monthChange! / oneMonthAgoNetWorth) * 100
-      : null;
-
-  let annualizedPct: number | null = null;
-  if (firstSnapshotDate && firstSnapshotNetWorth && firstSnapshotNetWorth > 0) {
-    const days =
-      (nowMs - new Date(firstSnapshotDate).getTime()) / 86400000;
-    if (days >= 30) {
-      const totalReturn = netWorth / firstSnapshotNetWorth;
-      annualizedPct = (Math.pow(totalReturn, 365 / days) - 1) * 100;
-    }
-  }
-
-  const byTag = Object.entries(
-    assets.reduce(
-      (acc, a) => {
-        const label = a.tag || "未分类";
-        acc[label] =
-          (acc[label] || 0) +
-          convertCurrency(a.marketValue, a.currency, currency, rates);
-        return acc;
-      },
-      {} as Record<string, number>
-    )
-  ).map(([name, value]) => ({ name, value }));
-
-  const byRisk = Object.entries(
-    assets.reduce(
-      (acc, a) => {
-        const label = a.riskLevel ? RISK_LABELS[a.riskLevel] : "未分类";
-        acc[label] =
-          (acc[label] || 0) +
-          convertCurrency(a.marketValue, a.currency, currency, rates);
-        return acc;
-      },
-      {} as Record<string, number>
-    )
-  ).map(([name, value]) => ({ name, value }));
+  const hasAssets = assets.length > 0;
 
   return (
     <div className="space-y-4 p-4">
@@ -197,12 +101,12 @@ export function DashboardClient({
         <CurrencySwitcher value={currency} onChange={setCurrency} />
       </div>
 
-      {assets.length > 0 ? (
+      {hasAssets ? (
         <Card className="py-2 text-center">
           <Card.Content>
             <p className="text-sm text-muted">总资产</p>
             <p className="text-3xl font-bold tabular-nums">
-              {formatCurrency(netWorth, currency)}
+              {formatCurrency(stats.netWorth, currency)}
             </p>
           </Card.Content>
         </Card>
@@ -215,42 +119,34 @@ export function DashboardClient({
         </Card>
       )}
 
-      {assets.length > 0 && (
+      {hasAssets && (
         <div className="grid grid-cols-3 gap-2">
           <StatCard
             label="累计盈亏"
-            value={formatCurrency(totalGain, currency)}
-            tone={gainLossTextClass(totalGain)}
+            value={formatCurrency(stats.totalGain, currency)}
+            tone={gainLossTextClass(stats.totalGain)}
           />
           <StatCard
             label="近1月"
-            value={
-              monthChangePct != null
-                ? `${monthChangePct >= 0 ? "+" : ""}${monthChangePct.toFixed(2)}%`
-                : "—"
-            }
-            tone={gainLossTextClass(monthChangePct ?? 0)}
+            value={fmtPct(stats.monthChangePct)}
+            tone={gainLossTextClass(stats.monthChangePct ?? 0)}
           />
           <StatCard
             label="年化"
-            value={
-              annualizedPct != null
-                ? `${annualizedPct >= 0 ? "+" : ""}${annualizedPct.toFixed(2)}%`
-                : "—"
-            }
-            tone={gainLossTextClass(annualizedPct ?? 0)}
+            value={fmtPct(stats.annualizedPct)}
+            tone={gainLossTextClass(stats.annualizedPct ?? 0)}
           />
         </div>
       )}
 
       <AllocationPieChart
-        data={byTag}
+        data={stats.byTag}
         title="按标签分配"
         currency={currency}
         centerLabel="总计"
       />
       <AllocationPieChart
-        data={byRisk}
+        data={stats.byRisk}
         title="按风险等级分配"
         colorMap={RISK_COLORS}
         currency={currency}

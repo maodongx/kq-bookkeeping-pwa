@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Asset, AssetPriceSnapshot, ExchangeRateSnapshot, Currency, Transaction } from "@/lib/types";
 import { fetchLatestRates } from "@/lib/exchange-rates";
 import { computeHolding } from "@/lib/asset-calculations";
-import { DashboardClient, EnrichedAsset } from "@/components/DashboardClient";
+import { DashboardAsset } from "@/lib/dashboard-stats";
+import { DashboardClient } from "@/components/DashboardClient";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -37,32 +38,23 @@ export default async function DashboardPage() {
     .sort()
     .pop() as string | null;
 
-  // Build per-asset enrichment. marketValue and totalCost are kept in the
-  // asset's NATIVE currency so the client can re-convert them into the
-  // currently-selected display currency without having to re-fetch.
-  const enriched: EnrichedAsset[] = assetList.map((asset) => {
-    const { totalCost, marketValue, gainLoss, gainPct } = computeHolding(
-      asset,
-      txList
-    );
+  // Project each asset to the minimal shape the dashboard needs. marketValue
+  // and totalCost stay in the asset's native currency so the client can
+  // re-convert into the user-selected display currency without a refetch.
+  const dashboardAssets: DashboardAsset[] = assetList.map((asset) => {
+    const { marketValue, totalCost } = computeHolding(asset, txList);
     return {
-      id: asset.id,
-      name: asset.name,
-      category: asset.category,
       currency: asset.currency,
-      symbol: asset.symbol,
-      tag: asset.tag,
-      riskLevel: asset.risk_level,
       marketValue,
       totalCost,
-      gainLoss,
-      gainPct,
+      tag: asset.tag,
+      riskLevel: asset.risk_level,
     };
   });
 
   return (
     <DashboardClient
-      assets={enriched}
+      assets={dashboardAssets}
       rawAssets={assetList}
       transactions={txList}
       priceSnapshots={pSnaps}
