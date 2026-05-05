@@ -77,17 +77,7 @@ export function AssetsClient({
   displayCurrency: Currency;
 }) {
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">资产</h1>
-        <Link
-          href="/assets/add"
-          className="button button--primary button--md"
-        >
-          + 添加
-        </Link>
-      </div>
-
+    <>
       {groups.length === 0 ? (
         <Card className="py-4 text-center">
           <Card.Content>
@@ -194,6 +184,6 @@ export function AssetsClient({
           ))}
         </Accordion>
       )}
-    </div>
+    </>
   );
 }

@@ -19,7 +19,6 @@ import {
 import { Card } from "@heroui/react";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { AllocationPieChart } from "./AllocationPieChart";
-import { RefreshPricesButton } from "./RefreshPricesButton";
 import { StatCard } from "./StatCard";
 
 /** "+3.21%", "-1.05%", or "—" when the percentage is not available. */
@@ -91,23 +90,18 @@ export function DashboardClient({
   const hasAssets = assets.length > 0;
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">总览</h1>
-        <div className="flex items-center gap-2">
-          {lastUpdate && (
-            <span className="text-xs text-muted">
-              {new Date(lastUpdate).toLocaleString("zh-CN", {
-                month: "numeric",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          )}
-          <RefreshPricesButton />
-        </div>
-      </div>
+    <>
+      {lastUpdate && (
+        <p className="-mt-2 text-center text-xs text-muted">
+          数据更新于{" "}
+          {new Date(lastUpdate).toLocaleString("zh-CN", {
+            month: "numeric",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </p>
+      )}
 
       <div className="flex justify-center">
         <CurrencySwitcher value={currency} onChange={setCurrency} />
@@ -164,6 +158,6 @@ export function DashboardClient({
         currency={currency}
         centerLabel="总计"
       />
-    </div>
+    </>
   );
 }

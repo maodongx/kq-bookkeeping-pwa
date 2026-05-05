@@ -46,9 +46,7 @@ export function ChartsClient({
   );
 
   return (
-    <div className="space-y-4 p-4">
-      <h1 className="text-xl font-bold">分析</h1>
-
+    <>
       <div className="flex justify-center">
         <CurrencySwitcher value={currency} onChange={setCurrency} />
       </div>
@@ -81,6 +79,6 @@ export function ChartsClient({
           <p className="text-muted">添加资产和交易后将展示分析</p>
         </Card>
       )}
-    </div>
+    </>
   );
 }

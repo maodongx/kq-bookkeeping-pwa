@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { Asset, AssetCategory, Currency, Transaction } from "@/lib/types";
 import { hasPerAssetGainLoss } from "@/lib/currency";
@@ -21,7 +23,27 @@ const CATEGORY_ORDER: AssetCategory[] = [
   "other",
 ];
 
-export default async function AssetsPage() {
+/**
+ * Static shell — synchronous. Title and "+ 添加" button paint immediately;
+ * the accordion body streams in via the Suspense boundary below.
+ */
+export default function AssetsPage() {
+  return (
+    <div className="space-y-4 p-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">资产</h1>
+        <Link href="/assets/add" className="button button--primary button--md">
+          + 添加
+        </Link>
+      </div>
+      <Suspense fallback={<AssetsBodySkeleton />}>
+        <AssetsBody />
+      </Suspense>
+    </div>
+  );
+}
+
+async function AssetsBody() {
   const supabase = await createClient();
 
   const [
@@ -99,5 +121,21 @@ export default async function AssetsPage() {
       totalWealth={totalWealth}
       displayCurrency={displayCurrency}
     />
+  );
+}
+
+/**
+ * Accordion-shaped placeholder: 4 rounded blocks stacked, approximating
+ * how the category rollups look before they expand. Short enough that
+ * the fill-in feels like a progressive reveal, not a rebuild.
+ */
+function AssetsBodySkeleton() {
+  return (
+    <>
+      <div className="h-14 animate-pulse rounded-2xl bg-default" />
+      <div className="h-14 animate-pulse rounded-2xl bg-default" />
+      <div className="h-14 animate-pulse rounded-2xl bg-default" />
+      <div className="h-14 animate-pulse rounded-2xl bg-default" />
+    </>
   );
 }

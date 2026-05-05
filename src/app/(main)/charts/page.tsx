@@ -1,8 +1,24 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { Asset, Currency, Transaction, AssetPriceSnapshot, ExchangeRateSnapshot } from "@/lib/types";
 import { ChartsClient } from "@/components/ChartsClient";
 
-export default async function ChartsPage() {
+/**
+ * Static shell — title paints immediately; the currency switcher,
+ * range picker, and line chart stream in via the Suspense boundary.
+ */
+export default function ChartsPage() {
+  return (
+    <div className="space-y-4 p-4">
+      <h1 className="text-xl font-bold">分析</h1>
+      <Suspense fallback={<ChartsBodySkeleton />}>
+        <ChartsBody />
+      </Suspense>
+    </div>
+  );
+}
+
+async function ChartsBody() {
   const supabase = await createClient();
 
   const [
@@ -32,5 +48,23 @@ export default async function ChartsPage() {
       rateSnapshots={(rateSnapshots || []) as ExchangeRateSnapshot[]}
       defaultCurrency={defaultCurrency}
     />
+  );
+}
+
+/**
+ * Shape-matching placeholder: currency pill, range toggle pill, and a
+ * tall line-chart area.
+ */
+function ChartsBodySkeleton() {
+  return (
+    <>
+      <div className="flex justify-center">
+        <div className="h-10 w-48 animate-pulse rounded-full bg-default" />
+      </div>
+      <div className="flex justify-center">
+        <div className="h-10 w-72 animate-pulse rounded-full bg-default" />
+      </div>
+      <div className="h-72 animate-pulse rounded-2xl bg-default" />
+    </>
   );
 }
