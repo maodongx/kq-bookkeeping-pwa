@@ -35,8 +35,8 @@ async function SpendingBody() {
 
 function SpendingBodySkeleton() {
   return (
-    <div className="grid grid-cols-4 gap-3">
-      {Array.from({ length: 8 }).map((_, i) => (
+    <div className="grid grid-cols-3 gap-3">
+      {Array.from({ length: 9 }).map((_, i) => (
         <div key={i} className="h-20 animate-pulse rounded-2xl bg-default" />
       ))}
     </div>
