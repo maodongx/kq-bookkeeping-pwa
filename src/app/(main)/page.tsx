@@ -53,11 +53,15 @@ async function DashboardBody() {
   const pSnaps = (priceSnapshots || []) as AssetPriceSnapshot[];
   const rSnaps = (rateSnapshots || []) as ExchangeRateSnapshot[];
 
-  const lastUpdate = assetList
-    .map((a) => a.last_price_update)
-    .filter(Boolean)
-    .sort()
-    .pop() as string | null;
+  // `last_price_update` is nullable on the row, so filter nulls out and
+  // grab the latest. Returns null when no asset has ever had a price
+  // refresh — DashboardClient already handles the null case.
+  const lastUpdate =
+    assetList
+      .map((a) => a.last_price_update)
+      .filter((t): t is string => t != null)
+      .sort()
+      .pop() ?? null;
 
   // Project each asset to the minimal shape the dashboard needs.
   // marketValue stays in the asset's native currency; the client
