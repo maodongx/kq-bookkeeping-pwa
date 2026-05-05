@@ -11,6 +11,7 @@ import {
 } from "@/lib/types";
 import {
   CATEGORY_LABELS,
+  RISK_LABELS,
   formatCurrency,
   gainLossTextClass,
 } from "@/lib/currency";
@@ -25,11 +26,10 @@ import { cn } from "@/lib/utils";
 export interface AssetRow {
   id: string;
   name: string;
+  /** Ticker / fund code. Shown as the primary chip (the "ID"). */
   symbol: string | null;
   tag: AssetTag | null;
   riskLevel: RiskLevel | null;
-  /** Asset's own currency (shown as a chip when it differs from display). */
-  nativeCurrency: Currency;
   /** Market value in the display currency. */
   valueInDisplay: number;
   /** Gain/loss in the display currency. Null for non-investments. */
@@ -127,13 +127,18 @@ export function AssetsClient({
                             </p>
                             <div className="mt-0.5 flex flex-wrap items-center gap-1">
                               {a.symbol && (
-                                <Chip variant="tertiary" size="sm">
+                                <Chip variant="secondary" size="sm">
                                   {a.symbol}
                                 </Chip>
                               )}
-                              {a.nativeCurrency !== displayCurrency && (
+                              {a.tag && (
                                 <Chip variant="tertiary" size="sm">
-                                  {a.nativeCurrency}
+                                  {a.tag}
+                                </Chip>
+                              )}
+                              {a.riskLevel && (
+                                <Chip variant="tertiary" size="sm">
+                                  {RISK_LABELS[a.riskLevel]}
                                 </Chip>
                               )}
                             </div>
