@@ -12,7 +12,13 @@ import { Currency } from "@/lib/types";
 import { formatCurrency } from "@/lib/currency";
 import { Card } from "@heroui/react";
 
-const ACCENT = "oklch(62.04% 0.1950 253.83)";
+/**
+ * Use the HeroUI theme's accent token so the line color follows light/dark
+ * mode and any future re-theming. SVG attributes accept `var(...)` — we
+ * verified this renders the stroke, fill, and the gradient stops correctly
+ * in Recharts' AreaChart. No JS read of the computed value is needed.
+ */
+const ACCENT = "var(--accent)";
 
 interface DataPoint {
   date: string;
