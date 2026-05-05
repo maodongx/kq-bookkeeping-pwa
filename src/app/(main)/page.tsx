@@ -38,19 +38,17 @@ export default async function DashboardPage() {
     .sort()
     .pop() as string | null;
 
-  // Project each asset to the minimal shape the dashboard needs. marketValue
-  // and totalCost stay in the asset's native currency so the client can
-  // re-convert into the user-selected display currency without a refetch.
-  const dashboardAssets: DashboardAsset[] = assetList.map((asset) => {
-    const { marketValue, totalCost } = computeHolding(asset, txList);
-    return {
-      currency: asset.currency,
-      marketValue,
-      totalCost,
-      tag: asset.tag,
-      riskLevel: asset.risk_level,
-    };
-  });
+  // Project each asset to the minimal shape the dashboard needs.
+  // marketValue stays in the asset's native currency; the client
+  // converts into the user-selected display currency per render.
+  // Per-asset cost basis is no longer on this projection — the
+  // dashboard derives "total gain" from cross-asset capital flows.
+  const dashboardAssets: DashboardAsset[] = assetList.map((asset) => ({
+    currency: asset.currency,
+    marketValue: computeHolding(asset, txList).marketValue,
+    tag: asset.tag,
+    riskLevel: asset.risk_level,
+  }));
 
   return (
     <DashboardClient
