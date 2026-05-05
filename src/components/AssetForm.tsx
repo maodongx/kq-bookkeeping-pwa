@@ -59,6 +59,21 @@ function defaultCurrencyFor(category: AssetCategory): Currency | null {
   return null;
 }
 
+/**
+ * Map the form's fund_provider field to what the DB should store. JP funds
+ * carry a real provider (mufg/rakuten/other); CN funds are always "other"
+ * since we don't distinguish providers there yet; everything else is null.
+ * Kept alongside AssetForm so the add and edit pages share the serialization.
+ */
+export function resolveFundProvider(
+  category: AssetCategory,
+  fundProvider: FundProvider
+): FundProvider | null {
+  if (category === "jpFund") return fundProvider;
+  if (category === "cnFund") return "other";
+  return null;
+}
+
 export function AssetForm({
   mode,
   initialValues = EMPTY_VALUES,

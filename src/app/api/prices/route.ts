@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { Asset } from "@/lib/types";
 import { todayUTC, todayTokyoCompact } from "@/lib/date";
+import { isInvestment } from "@/lib/currency";
 
 interface PriceResult {
   assetId: string;
@@ -130,7 +131,7 @@ export async function POST() {
   const { data: assets } = await supabase.from("assets").select("*");
   const allAssets = (assets || []) as Asset[];
   const investmentAssets = allAssets.filter(
-    (a) => (a.category === "usStock" || a.category === "jpFund" || a.category === "cnFund") && a.symbol
+    (a) => isInvestment(a.category) && a.symbol
   );
 
   if (investmentAssets.length === 0) {

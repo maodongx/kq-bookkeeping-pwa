@@ -45,7 +45,7 @@ function buildRateMapForDate(
     const key = `${r.base_currency}_${r.target_currency}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    rates[r.base_currency as Currency][r.target_currency as Currency] = Number(r.rate);
+    rates[r.base_currency][r.target_currency] = Number(r.rate);
     if (seen.size === 6) break;
   }
 

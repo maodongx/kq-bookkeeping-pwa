@@ -161,8 +161,8 @@ export function AllocationPieChart({
                 animationBegin={0}
                 animationDuration={600}
               >
-                {filtered.map((_, i) => (
-                  <Cell key={i} fill={sliceColors[i]} />
+                {filtered.map((slice, i) => (
+                  <Cell key={slice.name} fill={sliceColors[i]} />
                 ))}
               </Pie>
               <Tooltip

@@ -10,8 +10,10 @@ export async function refreshAllPrices(): Promise<{
   const priceData = priceRes.ok ? await priceRes.json() : { errors: ["Price API failed"] };
   const rateData = rateRes.ok ? await rateRes.json() : { errors: ["Exchange rate API failed"] };
 
-  return {
-    priceErrors: priceData.errors?.map((e: { error?: string }) => e.error || e) || [],
-    rateErrors: rateData.errors || [],
-  };
+  // /api/prices returns { errors: [{ assetId, error }] }; flatten to strings.
+  const priceErrors: string[] =
+    priceData.errors?.map((e: { error?: string }) => e.error ?? "Unknown error") ?? [];
+  const rateErrors: string[] = rateData.errors ?? [];
+
+  return { priceErrors, rateErrors };
 }

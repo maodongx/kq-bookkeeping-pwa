@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@heroui/react";
 import { todayLocal } from "@/lib/date";
+import { isInvestment } from "@/lib/currency";
 import {
   AssetForm,
   AssetFormValues,
+  resolveFundProvider,
 } from "@/components/AssetForm";
 
 export default function AddAssetPage() {
@@ -25,12 +27,7 @@ export default function AddAssetPage() {
         category: values.category,
         currency: values.currency,
         symbol: values.symbol.trim() || null,
-        fund_provider:
-          values.category === "jpFund"
-            ? values.fundProvider
-            : values.category === "cnFund"
-              ? "other"
-              : null,
+        fund_provider: resolveFundProvider(values.category, values.fundProvider),
         tag: values.tag || null,
         risk_level: values.riskLevel || null,
         note: values.note.trim() || null,
@@ -47,12 +44,8 @@ export default function AddAssetPage() {
     // Seed a deposit transaction for non-investment assets so the initial
     // balance is reflected in the ledger.
     const initialAmt = parseFloat(values.initialBalance);
-    const isInvestment =
-      values.category === "usStock" ||
-      values.category === "jpFund" ||
-      values.category === "cnFund";
 
-    if (!isInvestment && !isNaN(initialAmt) && initialAmt > 0) {
+    if (!isInvestment(values.category) && !isNaN(initialAmt) && initialAmt > 0) {
       await supabase.from("transactions").insert({
         asset_id: asset.id,
         type: "deposit",

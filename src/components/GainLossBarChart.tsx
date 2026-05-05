@@ -60,8 +60,8 @@ export function GainLossBarChart({
               }}
             />
             <Bar dataKey="gainLoss" radius={[0, 4, 4, 0]}>
-              {data.map((entry, i) => (
-                <Cell key={i} fill={gainLossFill(entry.gainLoss)} />
+              {data.map((entry) => (
+                <Cell key={entry.name} fill={gainLossFill(entry.gainLoss)} />
               ))}
             </Bar>
           </BarChart>

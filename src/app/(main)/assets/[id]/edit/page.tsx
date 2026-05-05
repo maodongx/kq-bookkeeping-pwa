@@ -9,6 +9,7 @@ import {
   AssetForm,
   AssetFormValues,
   EMPTY_VALUES,
+  resolveFundProvider,
 } from "@/components/AssetForm";
 
 export default function EditAssetPage() {
@@ -56,12 +57,7 @@ export default function EditAssetPage() {
         category: values.category,
         currency: values.currency,
         symbol: values.symbol.trim() || null,
-        fund_provider:
-          values.category === "jpFund"
-            ? values.fundProvider
-            : values.category === "cnFund"
-              ? "other"
-              : null,
+        fund_provider: resolveFundProvider(values.category, values.fundProvider),
         tag: values.tag || null,
         risk_level: values.riskLevel || null,
         note: values.note.trim() || null,
