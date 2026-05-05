@@ -13,7 +13,7 @@ This is a personal project, not a public product. The design goals are:
 
 ## Features
 
-- Add assets in 6 categories: US stocks, JP funds, CN funds, bank deposits, cash, other
+- Add assets in 8 categories: US stocks, JP funds, CN funds, money-market funds (货币基金), managed portfolios (委托理财), bank deposits, cash, other
 - Transactions with five types: buy, sell, deposit, withdraw, adjustment
 - Live price fetching for US stocks (Yahoo), MUFG / Rakuten JP funds, CN funds (Tiantian)
 - Exchange rates auto-refreshed on dashboard load
@@ -104,7 +104,7 @@ src/
 │   ├── UpdateBalanceForm.tsx      # For deposit/cash (not investments)
 │   ├── EditPriceButton.tsx        # Inline price edit on asset detail
 │   ├── RefreshPricesButton.tsx
-│   ├── BottomTabBar.tsx           # Lavender nav bar, 3 tabs
+│   ├── BottomTabBar.tsx           # Lavender nav bar, 5 tabs (总览/资产/记账/分析/图表)
 │   ├── CurrencySwitcher.tsx       # ToggleButtonGroup; persists user's default on change
 │   ├── NetWorthLineChart.tsx      # Recharts AreaChart
 │   ├── AllocationPieChart.tsx     # Donut with Chip legend
