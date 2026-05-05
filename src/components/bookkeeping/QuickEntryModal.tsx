@@ -1,9 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Input, Modal } from "@heroui/react";
+import type { Key } from "@heroui/react";
+import {
+  Button,
+  Input,
+  Modal,
+  ToggleButton,
+  ToggleButtonGroup,
+} from "@heroui/react";
 import { NumericKeypad } from "./NumericKeypad";
 import { todayLocal } from "@/lib/date";
+import { CURRENCY_SYMBOLS } from "@/lib/currency";
+import type { Currency } from "@/lib/types";
 import type { SpendingCategory } from "@/lib/bookkeeping-types";
 
 interface QuickEntryModalProps {
@@ -13,23 +22,26 @@ interface QuickEntryModalProps {
   onSave: (entry: {
     categoryId: string;
     amount: number;
+    currency: Currency;
     date: string;
     notes: string | null;
   }) => void;
 }
 
+const CURRENCIES: Currency[] = ["JPY", "USD", "CNY"];
+
 /**
  * Spending entry modal. Layout top-to-bottom:
  *
- *   备注: [_______________]      ← notes (compact, at top)
- *         ¥ 1,234                ← amount readout (right-aligned, prominent)
+ *   备注: [_______________]          ← notes (compact, at top)
+ *   [JPY|USD|CNY]       ¥ 1,234      ← currency picker + amount readout
  *   ┌───┬───┬───┐
  *   │ 7 │ 8 │ 9 │
- *   │ 4 │ 5 │ 6 │                ← phone-dialer keypad
+ *   │ 4 │ 5 │ 6 │                    ← phone-dialer keypad
  *   │ 1 │ 2 │ 3 │
  *   │ . │ 0 │ ⌫ │
  *   └───┴───┴───┘
- *   [date]   [  确认  ]          ← bottom row
+ *   [date]   [  确认  ]              ← bottom row
  */
 export function QuickEntryModal({
   category,
@@ -40,11 +52,15 @@ export function QuickEntryModal({
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [date, setDate] = useState(todayLocal());
+  // Default to JPY — daily spending in Japan is almost always yen. Users
+  // who pay in USD or CNY can flip per-entry via the toggle.
+  const [currency, setCurrency] = useState<Currency>("JPY");
 
   const reset = () => {
     setAmount("");
     setNotes("");
     setDate(todayLocal());
+    setCurrency("JPY");
   };
 
   const handleConfirm = () => {
@@ -52,6 +68,7 @@ export function QuickEntryModal({
     onSave({
       categoryId: category.id,
       amount: parseFloat(amount),
+      currency,
       date,
       notes: notes.trim() || null,
     });
@@ -64,7 +81,8 @@ export function QuickEntryModal({
     onClose();
   };
 
-  const canConfirm = !!amount && amount !== "0" && amount !== "." && amount !== "0.";
+  const canConfirm =
+    !!amount && amount !== "0" && amount !== "." && amount !== "0.";
 
   return (
     <Modal.Backdrop
@@ -89,9 +107,31 @@ export function QuickEntryModal({
                 variant="secondary"
               />
 
-              {/* Amount readout — big, right-aligned, tabular for stable glyph width */}
-              <div className="py-1 text-right text-4xl font-semibold tabular-nums">
-                ¥{amount || "0"}
+              {/* Currency picker + amount readout — same row, opposite sides.
+                  ToggleButtonGroup matches the pattern used by CurrencySwitcher
+                  on the dashboard so the two stay visually consistent. */}
+              <div className="flex items-center justify-between gap-2 py-1">
+                <ToggleButtonGroup
+                  aria-label="货币"
+                  selectionMode="single"
+                  disallowEmptySelection
+                  selectedKeys={new Set<Key>([currency])}
+                  onSelectionChange={(keys) => {
+                    const next = [...keys][0];
+                    if (next) setCurrency(next as Currency);
+                  }}
+                >
+                  {CURRENCIES.map((c, i) => (
+                    <ToggleButton key={c} id={c}>
+                      {i > 0 && <ToggleButtonGroup.Separator />}
+                      {c}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+                <div className="text-right text-4xl font-semibold tabular-nums">
+                  {CURRENCY_SYMBOLS[currency]}
+                  {amount || "0"}
+                </div>
               </div>
 
               {/* Numeric keypad */}

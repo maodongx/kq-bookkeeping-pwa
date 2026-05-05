@@ -8,6 +8,7 @@ import {
   SPENDING_CATEGORIES,
   createSpendingTransaction,
 } from "@/lib/bookkeeping-data";
+import type { Currency } from "@/lib/types";
 import type { SpendingCategory } from "@/lib/bookkeeping-types";
 
 interface SpendingClientProps {
@@ -27,6 +28,7 @@ export function SpendingClient({ userId }: SpendingClientProps) {
   const handleSave = async (entry: {
     categoryId: string;
     amount: number;
+    currency: Currency;
     date: string;
     notes: string | null;
   }) => {
@@ -35,7 +37,7 @@ export function SpendingClient({ userId }: SpendingClientProps) {
         userId,
         categoryId: entry.categoryId,
         amount: entry.amount,
-        currency: "JPY",
+        currency: entry.currency,
         date: entry.date,
         notes: entry.notes,
       });
