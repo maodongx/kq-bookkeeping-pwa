@@ -1,78 +1,92 @@
 import { createClient } from "@/lib/supabase/server";
-import { Asset } from "@/lib/types";
-import { CATEGORY_LABELS, RISK_LABELS } from "@/lib/currency";
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
-import { Card, Chip } from "@heroui/react";
+import { Asset, AssetCategory, Currency, Transaction } from "@/lib/types";
+import { isInvestment } from "@/lib/currency";
+import { computeHolding } from "@/lib/asset-calculations";
+import { convertCurrency, fetchLatestRates } from "@/lib/exchange-rates";
+import { AssetsClient, CategoryGroup } from "@/components/AssetsClient";
+
+/**
+ * Show categories in a predictable order regardless of how assets were
+ * created over time. Matches the order in CATEGORY_LABELS so the UI
+ * feels stable between sessions.
+ */
+const CATEGORY_ORDER: AssetCategory[] = [
+  "usStock",
+  "jpFund",
+  "cnFund",
+  "bankDeposit",
+  "cash",
+  "other",
+];
 
 export default async function AssetsPage() {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("assets")
-    .select("*")
-    .order("created_at", { ascending: false });
-  const assets = (data || []) as Asset[];
 
-  const grouped = assets.reduce((acc, asset) => {
-    (acc[asset.category] ||= []).push(asset);
-    return acc;
-  }, {} as Record<string, Asset[]>);
+  const [
+    { data: assets },
+    { data: transactions },
+    rates,
+    {
+      data: { user },
+    },
+  ] = await Promise.all([
+    supabase.from("assets").select("*"),
+    supabase.from("transactions").select("*"),
+    fetchLatestRates(supabase),
+    supabase.auth.getUser(),
+  ]);
 
-  return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">资产</h1>
-        <Link href="/assets/add" className="button button--primary button--md">
-          + 添加
-        </Link>
-      </div>
+  const displayCurrency =
+    (user?.user_metadata?.default_currency as Currency) || "USD";
 
-      {assets.length === 0 ? (
-        <Card className="py-4 text-center">
-          <Card.Content>
-            <p className="mb-2 text-4xl">📦</p>
-            <p className="text-muted">暂无资产</p>
-            <Link href="/assets/add" className="mt-2 inline-block text-sm text-accent underline-offset-4 hover:underline">
-              添加第一笔资产 →
-            </Link>
-          </Card.Content>
-        </Card>
-      ) : (
-        Object.entries(grouped).map(([category, items]) => (
-          <div key={category} className="space-y-1">
-            <h2 className="px-1 text-sm font-medium text-muted">
-              {CATEGORY_LABELS[category as Asset["category"]]}
-            </h2>
-            <Card>
-              <Card.Content className="divide-y divide-separator p-0">
-                {items.map((asset) => (
-                  <Link
-                    key={asset.id}
-                    href={`/assets/${asset.id}`}
-                    className="flex items-center justify-between p-3 transition-colors hover:bg-default"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">{asset.name}</p>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                        {asset.symbol && (
-                          <Chip variant="secondary" size="sm">{asset.symbol}</Chip>
-                        )}
-                        {asset.tag && (
-                          <Chip variant="tertiary" size="sm">{asset.tag}</Chip>
-                        )}
-                        {asset.risk_level && (
-                          <Chip variant="tertiary" size="sm">{RISK_LABELS[asset.risk_level]}</Chip>
-                        )}
-                      </div>
-                    </div>
-                    <ChevronRight className="size-4 text-muted" />
-                  </Link>
-                ))}
-              </Card.Content>
-            </Card>
-          </div>
-        ))
-      )}
-    </div>
+  const assetList = (assets || []) as Asset[];
+  const txList = (transactions || []) as Transaction[];
+
+  // Bucket assets into per-category groups and sum in the display currency.
+  // Per-asset marketValue and gainLoss come from the canonical computeHolding
+  // helper so the numbers match the detail page and the charts.
+  const groupMap = new Map<AssetCategory, CategoryGroup>();
+  for (const asset of assetList) {
+    const { marketValue, gainLoss, gainPct } = computeHolding(asset, txList);
+    const inv = isInvestment(asset.category);
+
+    const row = {
+      id: asset.id,
+      name: asset.name,
+      symbol: asset.symbol,
+      tag: asset.tag,
+      riskLevel: asset.risk_level,
+      nativeCurrency: asset.currency,
+      valueInDisplay: convertCurrency(
+        marketValue,
+        asset.currency,
+        displayCurrency,
+        rates
+      ),
+      gainLossInDisplay: inv
+        ? convertCurrency(gainLoss, asset.currency, displayCurrency, rates)
+        : null,
+      gainPct: inv ? gainPct : null,
+    };
+
+    let group = groupMap.get(asset.category);
+    if (!group) {
+      group = { category: asset.category, assets: [], totalValue: 0 };
+      groupMap.set(asset.category, group);
+    }
+    group.assets.push(row);
+    group.totalValue += row.valueInDisplay;
+  }
+
+  // Emit groups in CATEGORY_ORDER, skipping any category the user has no
+  // assets in. Inside each group, show the biggest position first — that's
+  // what the user is most likely scanning for on a small iPhone screen.
+  const groups: CategoryGroup[] = CATEGORY_ORDER.map((c) => groupMap.get(c)).filter(
+    (g): g is CategoryGroup => g !== undefined
   );
+  for (const g of groups) {
+    g.assets.sort((a, b) => b.valueInDisplay - a.valueInDisplay);
+  }
+
+  return <AssetsClient groups={groups} displayCurrency={displayCurrency} />;
 }
