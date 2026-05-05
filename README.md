@@ -19,7 +19,6 @@ This is a personal project, not a public product. The design goals are:
 - Exchange rates auto-refreshed on dashboard load
 - Dashboard with net worth, 累计盈亏 / 近1月 / 年化 stats, allocation pie charts by tag and by risk level
 - Charts page: net worth line chart (1W / 1M / 3M / 6M / 1Y / ALL)
-- JSON export / import with merge and replace modes
 - PWA with a purple cat icon and a hand-rolled service worker
 - Asian finance color convention throughout (red = gain, green = loss)
 
@@ -87,13 +86,10 @@ src/
 │   │   │   ├── add/page.tsx       # Client form, reuses AssetForm
 │   │   │   ├── [id]/page.tsx      # Asset detail + transaction history
 │   │   │   └── [id]/edit/page.tsx # Client form, reuses AssetForm
-│   │   ├── charts/page.tsx        # Analysis page (server → ChartsClient)
-│   │   └── settings/page.tsx      # Currency preference, export/import, sign out
+│   │   └── charts/page.tsx        # Analysis page (server → ChartsClient)
 │   ├── api/
 │   │   ├── prices/route.ts        # Proxies Yahoo / MUFG / Rakuten / Tiantian
 │   │   ├── exchange-rates/route.ts
-│   │   ├── export/route.ts        # Returns JSON attachment
-│   │   ├── import/route.ts        # mode=merge|replace
 │   │   └── auth/signout/route.ts
 │   ├── login/page.tsx             # Email + password form
 │   ├── layout.tsx                 # Root layout, Toast.Provider, service worker
@@ -108,11 +104,8 @@ src/
 │   ├── UpdateBalanceForm.tsx      # For deposit/cash (not investments)
 │   ├── EditPriceButton.tsx        # Inline price edit on asset detail
 │   ├── RefreshPricesButton.tsx
-│   ├── BottomTabBar.tsx           # Lavender nav bar, 4 tabs
-│   ├── CurrencySwitcher.tsx       # ToggleButtonGroup (single selection)
-│   ├── CurrencyPreferencePicker.tsx
-│   ├── ExportButton.tsx
-│   ├── ImportSection.tsx          # ToggleButtonGroup for merge/replace
+│   ├── BottomTabBar.tsx           # Lavender nav bar, 3 tabs
+│   ├── CurrencySwitcher.tsx       # ToggleButtonGroup; persists user's default on change
 │   ├── NetWorthLineChart.tsx      # Recharts AreaChart
 │   ├── AllocationPieChart.tsx     # Donut with Chip legend
 │   ├── StatCard.tsx               # Small label+value summary card

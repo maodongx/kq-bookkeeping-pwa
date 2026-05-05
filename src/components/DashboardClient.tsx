@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Asset,
@@ -12,11 +12,12 @@ import {
 import { formatCurrency, RISK_COLORS, gainLossTextClass } from "@/lib/currency";
 import { RateMap } from "@/lib/exchange-rates";
 import { refreshAllPrices } from "@/lib/prices";
+import { createClient } from "@/lib/supabase/client";
 import {
   DashboardAsset,
   computeDashboardStats,
 } from "@/lib/dashboard-stats";
-import { Card } from "@heroui/react";
+import { Button, Card } from "@heroui/react";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { AllocationPieChart } from "./AllocationPieChart";
 import { StatCard } from "./StatCard";
@@ -73,6 +74,21 @@ export function DashboardClient({
     refreshAllPrices().then(() => router.refresh());
   }, [router]);
 
+  /**
+   * Persist the tapped currency as the user's default. The dashboard's
+   * currency toggle used to be display-only; the persistent version
+   * lived on a dedicated settings page. Merging behaviors here means
+   * one tap now both switches the display AND updates user_metadata,
+   * so the choice sticks across devices on next load. Fire-and-forget
+   * — if the write fails the user only loses the default on next
+   * refresh, not the current view.
+   */
+  const handleCurrencyChange = useCallback((c: Currency) => {
+    setCurrency(c);
+    const supabase = createClient();
+    supabase.auth.updateUser({ data: { default_currency: c } });
+  }, []);
+
   const stats = useMemo(
     () =>
       computeDashboardStats({
@@ -104,7 +120,7 @@ export function DashboardClient({
       )}
 
       <div className="flex justify-center">
-        <CurrencySwitcher value={currency} onChange={setCurrency} />
+        <CurrencySwitcher value={currency} onChange={handleCurrencyChange} />
       </div>
 
       {hasAssets ? (
@@ -158,6 +174,16 @@ export function DashboardClient({
         currency={currency}
         centerLabel="总计"
       />
+
+      {/* Sign out lives at the bottom of the dashboard — the settings
+          page was deleted once its only other content (currency
+          preference) moved onto the toggle above. Tertiary variant
+          keeps it quiet; users scrolling for "log out" will find it. */}
+      <form action="/api/auth/signout" method="POST" className="pt-2">
+        <Button type="submit" variant="tertiary" size="sm" fullWidth>
+          退出登录
+        </Button>
+      </form>
     </>
   );
 }
