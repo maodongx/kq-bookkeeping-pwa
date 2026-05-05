@@ -6,7 +6,15 @@ import { createClient } from "@/lib/supabase/client";
 import { AssetCategory, TransactionType } from "@/lib/types";
 import { getAvailableTxTypes, TX_TYPE_LABELS, isInvestment } from "@/lib/currency";
 import { todayLocal } from "@/lib/date";
-import { Card, Button, Input, toast } from "@heroui/react";
+import type { Key } from "@heroui/react";
+import {
+  Card,
+  Button,
+  Input,
+  ToggleButton,
+  ToggleButtonGroup,
+  toast,
+} from "@heroui/react";
 
 export function AddTransactionForm({
   assetId,
@@ -18,7 +26,8 @@ export function AddTransactionForm({
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
-  const [type, setType] = useState<TransactionType>(getAvailableTxTypes(category)[0]);
+  const availableTypes = getAvailableTxTypes(category);
+  const [type, setType] = useState<TransactionType>(availableTypes[0]);
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
   const [amount, setAmount] = useState("");
@@ -73,19 +82,23 @@ export function AddTransactionForm({
       </Card.Header>
       <Card.Content>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="flex flex-wrap gap-1">
-            {getAvailableTxTypes(category).map((t) => (
-              <Button
-                key={t}
-                type="button"
-                size="sm"
-                variant={type === t ? "primary" : "secondary"}
-                onPress={() => setType(t)}
-              >
+          <ToggleButtonGroup
+            aria-label="交易类型"
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={new Set<Key>([type])}
+            onSelectionChange={(keys) => {
+              const next = [...keys][0];
+              if (next) setType(next as TransactionType);
+            }}
+          >
+            {availableTypes.map((t, i) => (
+              <ToggleButton key={t} id={t}>
+                {i > 0 && <ToggleButtonGroup.Separator />}
                 {TX_TYPE_LABELS[t]}
-              </Button>
+              </ToggleButton>
             ))}
-          </div>
+          </ToggleButtonGroup>
 
           {inv ? (
             <>

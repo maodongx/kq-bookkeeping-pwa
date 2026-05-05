@@ -11,7 +11,14 @@ import {
   getAvailableTxTypes,
   isInvestment,
 } from "@/lib/currency";
-import { Button, Input, Separator } from "@heroui/react";
+import type { Key } from "@heroui/react";
+import {
+  Button,
+  Input,
+  Separator,
+  ToggleButton,
+  ToggleButtonGroup,
+} from "@heroui/react";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 
 export function TransactionRow({
@@ -30,6 +37,7 @@ export function TransactionRow({
   const router = useRouter();
   const supabase = createClient();
   const inv = isInvestment(category);
+  const availableTypes = getAvailableTxTypes(category);
   const [confirm, ConfirmDialog] = useConfirmDialog();
 
   const [type, setType] = useState<TransactionType>(tx.type);
@@ -81,19 +89,23 @@ export function TransactionRow({
   if (isEditing) {
     return (
       <form onSubmit={handleSave} className="space-y-2 py-2">
-        <div className="flex flex-wrap gap-1">
-          {getAvailableTxTypes(category).map((t) => (
-            <Button
-              key={t}
-              type="button"
-              size="sm"
-              variant={type === t ? "primary" : "secondary"}
-              onPress={() => setType(t)}
-            >
+        <ToggleButtonGroup
+          aria-label="交易类型"
+          selectionMode="single"
+          disallowEmptySelection
+          selectedKeys={new Set<Key>([type])}
+          onSelectionChange={(keys) => {
+            const next = [...keys][0];
+            if (next) setType(next as TransactionType);
+          }}
+        >
+          {availableTypes.map((t, i) => (
+            <ToggleButton key={t} id={t}>
+              {i > 0 && <ToggleButtonGroup.Separator />}
               {TX_TYPE_LABELS[t]}
-            </Button>
+            </ToggleButton>
           ))}
-        </div>
+        </ToggleButtonGroup>
 
         {inv ? (
           <>
