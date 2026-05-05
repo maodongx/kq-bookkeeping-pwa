@@ -16,11 +16,7 @@
  * today" — users expect their local day, not UTC.
  */
 export function todayLocal(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return formatLocalDate(new Date());
 }
 
 /**
@@ -46,4 +42,33 @@ export function todayTokyoCompact(): string {
   return new Date()
     .toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" })
     .replace(/-/g, "");
+}
+
+/**
+ * Local-time calendar boundaries for a given month. Returns the first
+ * and last `YYYY-MM-DD` of the month, plus how many days it contains.
+ * Using the local Date constructor (rather than UTC) means "May 2026"
+ * is always May 1 through May 31 regardless of the user's offset —
+ * avoids the off-by-one that plain `.toISOString()` would introduce
+ * on late-month days when UTC has already rolled over.
+ */
+export function monthBoundariesLocal(
+  year: number,
+  monthIndex: number
+): { startDate: string; endDate: string; daysInMonth: number } {
+  const start = new Date(year, monthIndex, 1);
+  const end = new Date(year, monthIndex + 1, 0);
+  return {
+    startDate: formatLocalDate(start),
+    endDate: formatLocalDate(end),
+    daysInMonth: end.getDate(),
+  };
+}
+
+/** Format a Date as `YYYY-MM-DD` using its local-time fields. */
+export function formatLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }

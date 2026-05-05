@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Wallet, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Wallet, PenLine, PieChart, BarChart3 } from "lucide-react";
 import { Tabs } from "@heroui/react";
 
 const TABS = [
   { id: "/", label: "总览", icon: LayoutDashboard },
   { id: "/assets", label: "资产", icon: Wallet },
-  { id: "/charts", label: "分析", icon: BarChart3 },
+  { id: "/spending", label: "记账", icon: PenLine },
+  { id: "/analytics", label: "分析", icon: PieChart },
+  { id: "/charts", label: "图表", icon: BarChart3 },
 ] as const;
 
 function resolveTab(pathname: string): string {
