@@ -122,22 +122,22 @@ export function AssetsClient({
                           className="flex items-start justify-between gap-3 p-3 transition-colors hover:bg-default"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-base font-semibold">
+                            <p className="truncate text-base font-semibold text-foreground">
                               {a.name}
                             </p>
                             <div className="mt-0.5 flex flex-wrap items-center gap-1">
                               {a.symbol && (
-                                <Chip variant="secondary" size="sm">
+                                <Chip variant="secondary" size="sm" className="!text-muted">
                                   {a.symbol}
                                 </Chip>
                               )}
                               {a.tag && (
-                                <Chip variant="tertiary" size="sm">
+                                <Chip variant="tertiary" size="sm" className="!text-muted">
                                   {a.tag}
                                 </Chip>
                               )}
                               {a.riskLevel && (
-                                <Chip variant="tertiary" size="sm">
+                                <Chip variant="tertiary" size="sm" className="!text-muted">
                                   {RISK_LABELS[a.riskLevel]}
                                 </Chip>
                               )}
