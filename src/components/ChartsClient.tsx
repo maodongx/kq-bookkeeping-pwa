@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Card, Tabs } from "@heroui/react";
+import type { Key } from "@heroui/react";
+import { Card, ToggleButton, ToggleButtonGroup } from "@heroui/react";
 import { Asset, Transaction, AssetPriceSnapshot, ExchangeRateSnapshot, Currency } from "@/lib/types";
 import { RateMap } from "@/lib/exchange-rates";
 import {
@@ -59,21 +60,23 @@ export function ChartsClient({
       </div>
 
       <div className="flex justify-center">
-        <Tabs
-          selectedKey={range}
-          onSelectionChange={(k) => setRange(k as TimeRange)}
+        <ToggleButtonGroup
+          aria-label="时间范围"
+          selectionMode="single"
+          disallowEmptySelection
+          selectedKeys={new Set<Key>([range])}
+          onSelectionChange={(keys) => {
+            const next = [...keys][0];
+            if (next) setRange(next as TimeRange);
+          }}
         >
-          <Tabs.ListContainer>
-            <Tabs.List aria-label="时间范围">
-              {TIME_RANGES.map((r) => (
-                <Tabs.Tab key={r} id={r}>
-                  {TIME_RANGE_LABELS[r]}
-                  <Tabs.Indicator />
-                </Tabs.Tab>
-              ))}
-            </Tabs.List>
-          </Tabs.ListContainer>
-        </Tabs>
+          {TIME_RANGES.map((r, i) => (
+            <ToggleButton key={r} id={r}>
+              {i > 0 && <ToggleButtonGroup.Separator />}
+              {TIME_RANGE_LABELS[r]}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
       </div>
 
       <NetWorthLineChart data={timeSeries} currency={currency} />

@@ -1,6 +1,7 @@
 "use client";
 
-import { Tabs } from "@heroui/react";
+import type { Key } from "@heroui/react";
+import { ToggleButton, ToggleButtonGroup } from "@heroui/react";
 import { Currency } from "@/lib/types";
 
 const OPTIONS: { value: Currency; label: string }[] = [
@@ -9,6 +10,11 @@ const OPTIONS: { value: Currency; label: string }[] = [
   { value: "CNY", label: "CNY" },
 ];
 
+/**
+ * Mutually-exclusive currency selector. Uses ToggleButtonGroup (single
+ * selection, empty not allowed) rather than Tabs because the user is
+ * picking a state value, not navigating between views.
+ */
 export function CurrencySwitcher({
   value,
   onChange,
@@ -17,20 +23,22 @@ export function CurrencySwitcher({
   onChange: (c: Currency) => void;
 }) {
   return (
-    <Tabs
-      selectedKey={value}
-      onSelectionChange={(k) => onChange(k as Currency)}
+    <ToggleButtonGroup
+      aria-label="币种切换"
+      selectionMode="single"
+      disallowEmptySelection
+      selectedKeys={new Set<Key>([value])}
+      onSelectionChange={(keys) => {
+        const next = [...keys][0];
+        if (next) onChange(next as Currency);
+      }}
     >
-      <Tabs.ListContainer>
-        <Tabs.List aria-label="币种切换">
-          {OPTIONS.map((opt) => (
-            <Tabs.Tab key={opt.value} id={opt.value}>
-              {opt.label}
-              <Tabs.Indicator />
-            </Tabs.Tab>
-          ))}
-        </Tabs.List>
-      </Tabs.ListContainer>
-    </Tabs>
+      {OPTIONS.map((opt, i) => (
+        <ToggleButton key={opt.value} id={opt.value}>
+          {i > 0 && <ToggleButtonGroup.Separator />}
+          {opt.label}
+        </ToggleButton>
+      ))}
+    </ToggleButtonGroup>
   );
 }

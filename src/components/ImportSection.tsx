@@ -3,7 +3,14 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
-import { Tabs, Button, Input, toast } from "@heroui/react";
+import type { Key } from "@heroui/react";
+import {
+  Button,
+  Input,
+  ToggleButton,
+  ToggleButtonGroup,
+  toast,
+} from "@heroui/react";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 
 type ImportMode = "merge" | "replace";
@@ -70,21 +77,22 @@ export function ImportSection() {
 
       <div className="flex items-center gap-3">
         <span className="text-sm text-muted">模式:</span>
-        <Tabs
-          selectedKey={mode}
-          onSelectionChange={(k) => setMode(k as ImportMode)}
+        <ToggleButtonGroup
+          aria-label="导入模式"
+          selectionMode="single"
+          disallowEmptySelection
+          selectedKeys={new Set<Key>([mode])}
+          onSelectionChange={(keys) => {
+            const next = [...keys][0];
+            if (next) setMode(next as ImportMode);
+          }}
         >
-          <Tabs.ListContainer>
-            <Tabs.List aria-label="导入模式">
-              <Tabs.Tab id="merge">
-                合并<Tabs.Indicator />
-              </Tabs.Tab>
-              <Tabs.Tab id="replace">
-                替换<Tabs.Indicator />
-              </Tabs.Tab>
-            </Tabs.List>
-          </Tabs.ListContainer>
-        </Tabs>
+          <ToggleButton id="merge">合并</ToggleButton>
+          <ToggleButton id="replace">
+            <ToggleButtonGroup.Separator />
+            替换
+          </ToggleButton>
+        </ToggleButtonGroup>
       </div>
 
       <Button
