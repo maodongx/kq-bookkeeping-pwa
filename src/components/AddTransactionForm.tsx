@@ -3,18 +3,26 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { AssetCategory, TransactionType } from "@/lib/types";
-import { getAvailableTxTypes, TX_TYPE_LABELS, isInvestment } from "@/lib/currency";
+import { AssetCategory } from "@/lib/types";
+import { getAvailableTxTypes } from "@/lib/currency";
 import { todayLocal } from "@/lib/date";
-import type { Key } from "@heroui/react";
+import { Card, Button, toast } from "@heroui/react";
 import {
-  Card,
-  Button,
-  Input,
-  ToggleButton,
-  ToggleButtonGroup,
-  toast,
-} from "@heroui/react";
+  TransactionFields,
+  TransactionFormValues,
+  deriveTxPayload,
+} from "./TransactionFields";
+
+function initialValues(category: AssetCategory): TransactionFormValues {
+  return {
+    type: getAvailableTxTypes(category)[0],
+    quantity: "",
+    price: "",
+    amount: "",
+    date: todayLocal(),
+    note: "",
+  };
+}
 
 export function AddTransactionForm({
   assetId,
@@ -24,44 +32,33 @@ export function AddTransactionForm({
   category: AssetCategory;
 }) {
   const router = useRouter();
-  const supabase = createClient();
   const [open, setOpen] = useState(false);
-  const availableTypes = getAvailableTxTypes(category);
-  const [type, setType] = useState<TransactionType>(availableTypes[0]);
-  const [quantity, setQuantity] = useState("");
-  const [price, setPrice] = useState("");
-  const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(todayLocal());
-  const [note, setNote] = useState("");
+  const [values, setValues] = useState<TransactionFormValues>(() =>
+    initialValues(category)
+  );
   const [loading, setLoading] = useState(false);
 
-  const inv = isInvestment(category);
+  function update<K extends keyof TransactionFormValues>(
+    key: K,
+    value: TransactionFormValues[K]
+  ) {
+    setValues((prev) => ({ ...prev, [key]: value }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const qty = inv ? parseFloat(quantity) : parseFloat(amount);
-    const p = inv ? parseFloat(price) : 1;
-    const amt = inv ? qty * p : parseFloat(amount);
 
-    const { error } = await supabase.from("transactions").insert({
-      asset_id: assetId,
-      type,
-      quantity: inv ? qty : amt,
-      price: p,
-      amount: amt,
-      date,
-      note: note.trim() || null,
-    });
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("transactions")
+      .insert({ asset_id: assetId, ...deriveTxPayload(values, category) });
 
     if (error) {
       toast.danger("保存失败", { description: error.message });
     } else {
       setOpen(false);
-      setQuantity("");
-      setPrice("");
-      setAmount("");
-      setNote("");
+      setValues(initialValues(category));
       router.refresh();
     }
     setLoading(false);
@@ -82,38 +79,19 @@ export function AddTransactionForm({
       </Card.Header>
       <Card.Content>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <ToggleButtonGroup
-            aria-label="交易类型"
-            selectionMode="single"
-            disallowEmptySelection
-            selectedKeys={new Set<Key>([type])}
-            onSelectionChange={(keys) => {
-              const next = [...keys][0];
-              if (next) setType(next as TransactionType);
-            }}
-          >
-            {availableTypes.map((t, i) => (
-              <ToggleButton key={t} id={t}>
-                {i > 0 && <ToggleButtonGroup.Separator />}
-                {TX_TYPE_LABELS[t]}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
-
-          {inv ? (
-            <>
-              <Input type="number" step="any" placeholder="数量" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
-              <Input type="number" step="any" placeholder="单价" value={price} onChange={(e) => setPrice(e.target.value)} required />
-            </>
-          ) : (
-            <Input type="number" step="any" placeholder="金额" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-          )}
-
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          <Input placeholder="备注" value={note} onChange={(e) => setNote(e.target.value)} />
+          <TransactionFields
+            values={values}
+            onChange={update}
+            category={category}
+          />
 
           <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onPress={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onPress={() => setOpen(false)}
+            >
               取消
             </Button>
             <Button type="submit" className="flex-1" isDisabled={loading}>

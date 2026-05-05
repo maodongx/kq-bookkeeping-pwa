@@ -4,22 +4,30 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { AssetCategory, Currency, Transaction, TransactionType } from "@/lib/types";
+import { AssetCategory, Currency, Transaction } from "@/lib/types";
 import {
   formatCurrency,
   TX_TYPE_LABELS,
-  getAvailableTxTypes,
   isInvestment,
 } from "@/lib/currency";
-import type { Key } from "@heroui/react";
-import {
-  Button,
-  Input,
-  Separator,
-  ToggleButton,
-  ToggleButtonGroup,
-} from "@heroui/react";
+import { Button, Separator } from "@heroui/react";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import {
+  TransactionFields,
+  TransactionFormValues,
+  deriveTxPayload,
+} from "./TransactionFields";
+
+function valuesFromTx(tx: Transaction): TransactionFormValues {
+  return {
+    type: tx.type,
+    quantity: tx.quantity.toString(),
+    price: tx.price.toString(),
+    amount: tx.amount.toString(),
+    date: tx.date,
+    note: tx.note || "",
+  };
+}
 
 export function TransactionRow({
   tx,
@@ -35,19 +43,21 @@ export function TransactionRow({
   onEditToggle: () => void;
 }) {
   const router = useRouter();
-  const supabase = createClient();
   const inv = isInvestment(category);
-  const availableTypes = getAvailableTxTypes(category);
   const [confirm, ConfirmDialog] = useConfirmDialog();
 
-  const [type, setType] = useState<TransactionType>(tx.type);
-  const [quantity, setQuantity] = useState(tx.quantity.toString());
-  const [price, setPrice] = useState(tx.price.toString());
-  const [amount, setAmount] = useState(tx.amount.toString());
-  const [date, setDate] = useState(tx.date);
-  const [note, setNote] = useState(tx.note || "");
+  const [values, setValues] = useState<TransactionFormValues>(() =>
+    valuesFromTx(tx)
+  );
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  function update<K extends keyof TransactionFormValues>(
+    key: K,
+    value: TransactionFormValues[K]
+  ) {
+    setValues((prev) => ({ ...prev, [key]: value }));
+  }
 
   async function handleDelete() {
     const ok = await confirm({
@@ -58,6 +68,7 @@ export function TransactionRow({
     });
     if (!ok) return;
     setDeleting(true);
+    const supabase = createClient();
     await supabase.from("transactions").delete().eq("id", tx.id);
     router.refresh();
   }
@@ -65,20 +76,10 @@ export function TransactionRow({
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const qty = inv ? parseFloat(quantity) : parseFloat(amount);
-    const p = inv ? parseFloat(price) : 1;
-    const amt = inv ? qty * p : parseFloat(amount);
-
+    const supabase = createClient();
     await supabase
       .from("transactions")
-      .update({
-        type,
-        quantity: inv ? qty : amt,
-        price: p,
-        amount: amt,
-        date,
-        note: note.trim() || null,
-      })
+      .update(deriveTxPayload(values, category))
       .eq("id", tx.id);
 
     setSaving(false);
@@ -89,41 +90,28 @@ export function TransactionRow({
   if (isEditing) {
     return (
       <form onSubmit={handleSave} className="space-y-2 py-2">
-        <ToggleButtonGroup
-          aria-label="交易类型"
-          selectionMode="single"
-          disallowEmptySelection
-          selectedKeys={new Set<Key>([type])}
-          onSelectionChange={(keys) => {
-            const next = [...keys][0];
-            if (next) setType(next as TransactionType);
-          }}
-        >
-          {availableTypes.map((t, i) => (
-            <ToggleButton key={t} id={t}>
-              {i > 0 && <ToggleButtonGroup.Separator />}
-              {TX_TYPE_LABELS[t]}
-            </ToggleButton>
-          ))}
-        </ToggleButtonGroup>
-
-        {inv ? (
-          <>
-            <Input type="number" step="any" placeholder="数量" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
-            <Input type="number" step="any" placeholder="单价" value={price} onChange={(e) => setPrice(e.target.value)} required />
-          </>
-        ) : (
-          <Input type="number" step="any" placeholder="金额" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-        )}
-
-        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        <Input placeholder="备注" value={note} onChange={(e) => setNote(e.target.value)} />
+        <TransactionFields
+          values={values}
+          onChange={update}
+          category={category}
+        />
 
         <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" className="flex-1" onPress={onEditToggle}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onPress={onEditToggle}
+          >
             取消
           </Button>
-          <Button type="submit" size="sm" className="flex-1" isDisabled={saving}>
+          <Button
+            type="submit"
+            size="sm"
+            className="flex-1"
+            isDisabled={saving}
+          >
             保存
           </Button>
         </div>
