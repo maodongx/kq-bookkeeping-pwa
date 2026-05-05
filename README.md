@@ -170,7 +170,7 @@ All computed values (market value, total cost, gain/loss, balance) are derived a
 
 - **Commit style**: Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `perf:`, `docs:`, `style:`). Subject imperative, ≤50 chars. Body wraps at 72. Separate subject from body with a blank line.
 - **Color convention**: Asian finance — red = gain, green = loss. Use `gainLossTextClass()` and `gainLossFill()` from `lib/currency.ts`; never hardcode colors. Risk levels use a separate palette (green / yellow / orange) so `高风险` doesn't collide with red-means-gain.
-- **Segmented toggles**: use HeroUI `ToggleButtonGroup`, not `Tabs`. Tabs are for navigation only (see `BottomTabBar`).
+- **Segmented toggles**: use HeroUI `ToggleButtonGroup`, not `Tabs`. Tabs are for navigation only (see `BottomTabBar`). The transaction type picker, currency picker, import mode picker, and time range picker all use `ToggleButtonGroup`.
 - **Confirmations**: `useConfirmDialog()` + `<ConfirmDialog />`, never `window.confirm()`. Toasts: `toast.success/warning/danger`, never `alert()`.
 - **Date handling**: `src/lib/date.ts` helpers (`todayLocal` / `todayUTC` / `todayTokyoCompact`). Never inline `new Date().toISOString().split("T")[0]` — the choice of UTC vs. local matters and should be explicit.
 - **Holding math**: exactly one function — `computeHolding(asset, transactions)` — returns everything needed. Do not inline reducers.
