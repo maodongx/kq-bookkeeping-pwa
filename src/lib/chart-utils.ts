@@ -2,7 +2,6 @@ import { Asset, Transaction, AssetPriceSnapshot, ExchangeRateSnapshot, Currency 
 import { isInvestment } from "./currency";
 import { RateMap, convertCurrency } from "./exchange-rates";
 import { computeHolding } from "./asset-calculations";
-
 export type TimeRange = "1W" | "1M" | "3M" | "6M" | "1Y" | "ALL";
 
 export const TIME_RANGE_LABELS: Record<TimeRange, string> = {
@@ -64,26 +63,24 @@ function getAssetValueOnDate(
 
   if (txsBefore.length === 0) return 0;
 
-  if (isInvestment(asset.category)) {
-    const qty = txsBefore.reduce((sum, tx) => {
-      if (tx.type === "buy") return sum + tx.quantity;
-      if (tx.type === "sell") return sum - tx.quantity;
-      return sum;
-    }, 0);
+  // Delegate transaction replay to computeHolding — the canonical
+  // "given these transactions, what's the position?" helper. This keeps
+  // historical net-worth reconstruction consistent with per-asset views
+  // (detail page, gain/loss bar chart) and picks up adjustment-quantity
+  // handling for free. We only override the PRICE side for investments,
+  // since computeHolding's marketValue uses today's price but the
+  // historical series wants the price snapshot on or before `date`.
+  const { totalQty, balance } = computeHolding(asset, txsBefore);
 
+  if (isInvestment(asset.category)) {
     const snap = priceSnapshots
       .filter((s) => s.asset_id === asset.id && s.date <= date)
       .pop();
     const price = snap ? Number(snap.price) : asset.current_price || 0;
-
-    return qty * price;
+    return totalQty * price;
   }
 
-  return txsBefore.reduce((sum, tx) => {
-    if (tx.type === "deposit" || tx.type === "buy") return sum + tx.amount;
-    if (tx.type === "withdraw" || tx.type === "sell") return sum - tx.amount;
-    return sum + tx.amount;
-  }, 0);
+  return balance;
 }
 
 export function computeNetWorthTimeSeries(
