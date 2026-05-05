@@ -11,7 +11,6 @@ import type {
 } from "@/lib/bookkeeping-types";
 
 interface BudgetSettingsModalProps {
-  userId: string;
   category: SpendingCategory;
   currentBudget: CategoryBudget | null;
   isOpen: boolean;
@@ -26,12 +25,11 @@ const CURRENCY_OPTIONS: Array<{ value: Currency; label: string }> = [
 ];
 
 /**
- * Edit (or create) the monthly budget for one category. userId is passed
- * in rather than re-fetched — the parent page already trusted layout-
- * level auth — so saving doesn't re-hit auth.getUser().
+ * Edit (or create) the monthly budget for one category. Budgets are
+ * shared across the household, so no user id is needed — the RLS
+ * policy lets any authenticated user write.
  */
 export function BudgetSettingsModal({
-  userId,
   category,
   currentBudget,
   isOpen,
@@ -53,7 +51,6 @@ export function BudgetSettingsModal({
     setIsSaving(true);
     try {
       const saved = await upsertCategoryBudget({
-        userId,
         categoryId: category.id,
         monthlyBudget: numAmount,
         currency,

@@ -63,11 +63,7 @@ function computeSummaries(
   );
 }
 
-interface AnalyticsClientProps {
-  userId: string;
-}
-
-export function AnalyticsClient({ userId }: AnalyticsClientProps) {
+export function AnalyticsClient() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -90,8 +86,8 @@ export function AnalyticsClient({ userId }: AnalyticsClientProps) {
       setLoading(true);
       try {
         const [txs, bgs] = await Promise.all([
-          getSpendingTransactions(userId, sd, ed),
-          getCategoryBudgets(userId),
+          getSpendingTransactions(sd, ed),
+          getCategoryBudgets(),
         ]);
         if (!cancelled) {
           setTransactions(txs);
@@ -111,7 +107,7 @@ export function AnalyticsClient({ userId }: AnalyticsClientProps) {
     return () => {
       cancelled = true;
     };
-  }, [userId, year, month]);
+  }, [year, month]);
 
   const goToPrevMonth = () => {
     if (month === 0) {
@@ -210,7 +206,6 @@ export function AnalyticsClient({ userId }: AnalyticsClientProps) {
 
       {selectedCategory && (
         <BudgetSettingsModal
-          userId={userId}
           category={selectedCategory}
           currentBudget={selectedBudget}
           isOpen={!!selectedCategory}

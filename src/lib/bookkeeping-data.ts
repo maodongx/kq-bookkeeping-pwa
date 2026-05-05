@@ -80,7 +80,6 @@ export const SPENDING_CATEGORIES: SpendingCategory[] = [
 
 /** Fetch spending transactions within an inclusive date range. */
 export async function getSpendingTransactions(
-  userId: string,
   startDate: string,
   endDate: string
 ): Promise<SpendingTransaction[]> {
@@ -88,7 +87,6 @@ export async function getSpendingTransactions(
   const { data, error } = await supabase
     .from("spending_transactions")
     .select("*")
-    .eq("user_id", userId)
     .gte("date", startDate)
     .lte("date", endDate)
     .order("date", { ascending: false });
@@ -97,7 +95,6 @@ export async function getSpendingTransactions(
 
   return (data ?? []).map((row) => ({
     id: row.id,
-    userId: row.user_id,
     categoryId: row.category_id,
     amount: row.amount,
     currency: row.currency,
@@ -115,7 +112,6 @@ export async function createSpendingTransaction(
   const { data, error } = await supabase
     .from("spending_transactions")
     .insert({
-      user_id: tx.userId,
       category_id: tx.categoryId,
       amount: tx.amount,
       currency: tx.currency,
@@ -129,7 +125,6 @@ export async function createSpendingTransaction(
 
   return {
     id: data.id,
-    userId: data.user_id,
     categoryId: data.category_id,
     amount: data.amount,
     currency: data.currency,
@@ -139,28 +134,24 @@ export async function createSpendingTransaction(
   };
 }
 
-/** Fetch all category budgets for a user. */
-export async function getCategoryBudgets(
-  userId: string
-): Promise<CategoryBudget[]> {
+/** Fetch all category budgets (shared across the household). */
+export async function getCategoryBudgets(): Promise<CategoryBudget[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("category_budgets")
-    .select("*")
-    .eq("user_id", userId);
+    .select("*");
 
   if (error) throw error;
 
   return (data ?? []).map((row) => ({
     id: row.id,
-    userId: row.user_id,
     categoryId: row.category_id,
     monthlyBudget: row.monthly_budget,
     currency: row.currency,
   }));
 }
 
-/** Create or update a category budget (upsert by user + category). */
+/** Create or update a category budget (upsert by category_id). */
 export async function upsertCategoryBudget(
   budget: Omit<CategoryBudget, "id">
 ): Promise<CategoryBudget> {
@@ -169,12 +160,11 @@ export async function upsertCategoryBudget(
     .from("category_budgets")
     .upsert(
       {
-        user_id: budget.userId,
         category_id: budget.categoryId,
         monthly_budget: budget.monthlyBudget,
         currency: budget.currency,
       },
-      { onConflict: "user_id,category_id" }
+      { onConflict: "category_id" }
     )
     .select()
     .single();
@@ -183,7 +173,6 @@ export async function upsertCategoryBudget(
 
   return {
     id: data.id,
-    userId: data.user_id,
     categoryId: data.category_id,
     monthlyBudget: data.monthly_budget,
     currency: data.currency,

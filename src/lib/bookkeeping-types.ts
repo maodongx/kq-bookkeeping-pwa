@@ -18,7 +18,6 @@ export interface SpendingCategory {
 /** A single spending transaction row. */
 export interface SpendingTransaction {
   id: string;
-  userId: string;
   categoryId: string;
   amount: number;
   currency: Currency;
@@ -29,10 +28,9 @@ export interface SpendingTransaction {
   createdAt: string;
 }
 
-/** Monthly budget for a category (one per user per category). */
+/** Monthly budget for a category. One per category, shared across the household. */
 export interface CategoryBudget {
   id: string;
-  userId: string;
   categoryId: string;
   monthlyBudget: number;
   currency: Currency;

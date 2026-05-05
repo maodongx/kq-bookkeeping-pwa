@@ -11,11 +11,7 @@ import {
 import type { Currency } from "@/lib/types";
 import type { SpendingCategory } from "@/lib/bookkeeping-types";
 
-interface SpendingClientProps {
-  userId: string;
-}
-
-export function SpendingClient({ userId }: SpendingClientProps) {
+export function SpendingClient() {
   const [selectedCategory, setSelectedCategory] =
     useState<SpendingCategory | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,7 +30,6 @@ export function SpendingClient({ userId }: SpendingClientProps) {
   }) => {
     try {
       await createSpendingTransaction({
-        userId,
         categoryId: entry.categoryId,
         amount: entry.amount,
         currency: entry.currency,
