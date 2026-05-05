@@ -17,7 +17,7 @@ import {
   DashboardAsset,
   computeDashboardStats,
 } from "@/lib/dashboard-stats";
-import { Button, Card } from "@heroui/react";
+import { Card } from "@heroui/react";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { AllocationPieChart } from "./AllocationPieChart";
 import { StatCard } from "./StatCard";
@@ -174,16 +174,6 @@ export function DashboardClient({
         currency={currency}
         centerLabel="总计"
       />
-
-      {/* Sign out lives at the bottom of the dashboard — the settings
-          page was deleted once its only other content (currency
-          preference) moved onto the toggle above. Tertiary variant
-          keeps it quiet; users scrolling for "log out" will find it. */}
-      <form action="/api/auth/signout" method="POST" className="pt-2">
-        <Button type="submit" variant="tertiary" size="sm" fullWidth>
-          退出登录
-        </Button>
-      </form>
     </>
   );
 }
