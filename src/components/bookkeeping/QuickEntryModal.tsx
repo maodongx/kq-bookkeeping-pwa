@@ -12,64 +12,87 @@ import {
 } from "@heroui/react";
 import { todayLocal } from "@/lib/date";
 import { getTopNotesForCategory } from "@/lib/bookkeeping-data";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import type { Currency } from "@/lib/types";
 import type { SpendingCategory } from "@/lib/bookkeeping-types";
+
+export interface SpendingEntry {
+  categoryId: string;
+  amount: number;
+  currency: Currency;
+  date: string;
+  notes: string | null;
+}
+
+export interface SpendingInitialValues {
+  amount: number;
+  currency: Currency;
+  date: string;
+  notes: string | null;
+}
 
 interface QuickEntryModalProps {
   category: SpendingCategory | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (entry: {
-    categoryId: string;
-    amount: number;
-    currency: Currency;
-    date: string;
-    notes: string | null;
-  }) => void;
+  onSave: (entry: SpendingEntry) => void;
+  /**
+   * When provided, the modal pre-fills with these values and represents
+   * editing an existing transaction. The caller is still responsible for
+   * actually persisting via `onSave` (e.g. updateSpendingTransaction).
+   * Caller should set `key={tx.id}` on the modal so state re-inits when
+   * the transaction being edited changes.
+   */
+  initialValues?: SpendingInitialValues | null;
+  /**
+   * When provided (edit mode only), renders a muted "删除" button at the
+   * bottom that asks for confirmation before firing. Caller handles the
+   * actual delete.
+   */
+  onDelete?: () => void | Promise<void>;
 }
 
 const CURRENCIES: Currency[] = ["JPY", "USD", "CNY"];
 
 /**
- * Spending entry modal. Native number input instead of a custom keypad —
- * iPhone surfaces its system numeric keyboard for `type="number"` +
- * `inputMode="decimal"`, which takes less screen real-estate than a
- * rendered keypad and feels more native.
+ * Spending entry modal. Works for both create (from /spending category
+ * tap) and edit (from /analytics transaction row tap) — the `initialValues`
+ * and `onDelete` props flip the behavior.
  *
  * Layout top-to-bottom:
  *
  *   [备注（可选）______________]
+ *   [chip] [chip] [chip] ...           ← top 5 notes for this category
  *                [JPY|USD|CNY]          ← centered
- *   价格     [0________________]
- *   [date]                   [确认]
- *
- * All Inputs opt into the `input-flat` helper class (defined in
- * globals.css) which suppresses HeroUI's default focus ring. Users
- * tapping between fields in a tight modal found the accent-colored
- * ring visually heavy; rely on the cursor for focus indication
- * instead.
+ *   价格     [0________________]        ← native number input
+ *   [date]                     [确认]
+ *   (edit mode only) [ 删除 ]          ← muted, centered
  */
 export function QuickEntryModal({
   category,
   isOpen,
   onClose,
   onSave,
+  initialValues = null,
+  onDelete,
 }: QuickEntryModalProps) {
-  const [amount, setAmount] = useState("");
-  const [notes, setNotes] = useState("");
-  const [date, setDate] = useState(todayLocal());
-  // Default to JPY — daily spending in Japan is almost always yen. Users
-  // who pay in USD or CNY can flip per-entry via the toggle.
-  const [currency, setCurrency] = useState<Currency>("JPY");
-  // Top 5 recently-used notes for this category, shown as tappable chips.
-  // Re-fetched on every modal open so new entries reshape the ranking.
+  // useState's lazy initializer runs once per mount. Callers editing a
+  // different transaction should use `key={tx.id}` to force a fresh mount.
+  const [amount, setAmount] = useState(() =>
+    initialValues ? String(initialValues.amount) : ""
+  );
+  const [notes, setNotes] = useState(() => initialValues?.notes ?? "");
+  const [date, setDate] = useState(() => initialValues?.date ?? todayLocal());
+  const [currency, setCurrency] = useState<Currency>(
+    () => initialValues?.currency ?? "JPY"
+  );
   const [suggestions, setSuggestions] = useState<string[]>([]);
 
-  // Capture just the id so the effect's deps array doesn't depend on the
-  // whole category object (which would refire if the parent passed a new
-  // reference for the same category). Resetting suggestions back to []
-  // is handled by reset() on close/confirm, not here — React Compiler
-  // forbids sync state writes at effect-setup time.
+  const [confirmDelete, ConfirmDeleteDialog] = useConfirmDialog();
+
+  // Capture the category id as a stable primitive so the effect's deps
+  // don't thrash if the parent passes a new object reference for the
+  // same logical category.
   const categoryId = category?.id ?? null;
   useEffect(() => {
     if (!isOpen || !categoryId) return;
@@ -79,7 +102,7 @@ export function QuickEntryModal({
         if (!cancelled) setSuggestions(top);
       })
       .catch(() => {
-        // Non-fatal — just no suggestions. The user can still type freely.
+        // Non-fatal — suggestions are optional UX sugar.
       });
     return () => {
       cancelled = true;
@@ -113,7 +136,22 @@ export function QuickEntryModal({
     onClose();
   };
 
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    const ok = await confirmDelete({
+      heading: "确定删除此笔支出？",
+      body: "此操作不可恢复。",
+      status: "danger",
+      confirmLabel: "删除",
+    });
+    if (!ok) return;
+    await onDelete();
+    reset();
+    onClose();
+  };
+
   const canConfirm = parseFloat(amount) > 0;
+  const isEdit = initialValues != null;
 
   return (
     <Modal.Backdrop
@@ -130,7 +168,7 @@ export function QuickEntryModal({
           </Modal.Header>
           <Modal.Body>
             <div className="flex flex-col gap-4">
-              {/* Notes — compact single-line input */}
+              {/* Notes */}
               <Input
                 placeholder="备注（可选）"
                 value={notes}
@@ -139,8 +177,7 @@ export function QuickEntryModal({
                 className="input-flat"
               />
 
-              {/* Quick-fill chips: top 5 most-used notes for this category.
-                  Tap to prefill; user can still edit afterwards. */}
+              {/* Quick-fill chips */}
               {suggestions.length > 0 && (
                 <div className="-mt-2 flex flex-wrap gap-2">
                   {suggestions.map((s) => (
@@ -180,7 +217,7 @@ export function QuickEntryModal({
                 </ToggleButtonGroup>
               </div>
 
-              {/* Price — inline label + number input */}
+              {/* Price row */}
               <div className="flex items-center gap-3">
                 <span className="shrink-0 text-sm text-muted">价格</span>
                 <Input
@@ -196,7 +233,7 @@ export function QuickEntryModal({
                 />
               </div>
 
-              {/* Date + Confirm — share the bottom row */}
+              {/* Date + Confirm */}
               <div className="flex items-center gap-2 pt-1">
                 <Input
                   type="date"
@@ -210,10 +247,25 @@ export function QuickEntryModal({
                   onPress={handleConfirm}
                   isDisabled={!canConfirm}
                 >
-                  确认
+                  {isEdit ? "保存" : "确认"}
                 </Button>
               </div>
+
+              {/* Delete — only in edit mode */}
+              {onDelete && (
+                <div className="flex justify-center">
+                  <Button
+                    variant="tertiary"
+                    size="sm"
+                    className="text-danger"
+                    onPress={handleDelete}
+                  >
+                    删除
+                  </Button>
+                </div>
+              )}
             </div>
+            <ConfirmDeleteDialog />
           </Modal.Body>
         </Modal.Dialog>
       </Modal.Container>

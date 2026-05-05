@@ -1,87 +1,158 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
-import { Card, ProgressBar } from "@heroui/react";
+import { AlertTriangle, ChevronDown } from "lucide-react";
+import { Accordion, ProgressBar } from "@heroui/react";
 import {
   CATEGORY_ICONS,
   CATEGORY_ICON_FALLBACK,
 } from "@/lib/bookkeeping-data";
-import type { CategorySpendingSummary } from "@/lib/bookkeeping-types";
+import type {
+  CategorySpendingSummary,
+  SpendingTransaction,
+} from "@/lib/bookkeeping-types";
 
 interface CategoryBreakdownProps {
   summaries: CategorySpendingSummary[];
-  onCategoryTap?: (categoryId: string) => void;
+  transactions: SpendingTransaction[];
+  /** Fires when the 修改预算 link is tapped for a category header. */
+  onEditBudget: (categoryId: string) => void;
+  /** Fires when an individual transaction row is tapped. */
+  onEditTx: (tx: SpendingTransaction) => void;
 }
 
 /**
- * Per-category spending cards for the analytics page. Sorted by amount
- * descending so the biggest line items are immediately visible. A warning
- * icon + orange progress bar surface "projected overspend" from the
- * pace-based check in `calculateBudgetWarning`.
+ * Per-category accordion: header shows the rollup (count + total + share%
+ * + optional progress bar), expanding reveals every transaction in that
+ * category sorted by date desc plus a "修改预算" link at the top. Mirrors
+ * the drill-down pattern used on the assets tab.
+ *
+ * Sorted by total spent desc — biggest categories first, matching how
+ * users scan for "where did my money go".
  */
 export function CategoryBreakdown({
   summaries,
-  onCategoryTap,
+  transactions,
+  onEditBudget,
+  onEditTx,
 }: CategoryBreakdownProps) {
   const sorted = [...summaries].sort((a, b) => b.totalSpent - a.totalSpent);
   const total = sorted.reduce((sum, s) => sum + s.totalSpent, 0);
 
+  // Group transactions by category once and sort each group date desc.
+  const txByCategory = new Map<string, SpendingTransaction[]>();
+  for (const tx of transactions) {
+    const arr = txByCategory.get(tx.categoryId) ?? [];
+    arr.push(tx);
+    txByCategory.set(tx.categoryId, arr);
+  }
+  for (const arr of txByCategory.values()) {
+    arr.sort((a, b) => b.date.localeCompare(a.date));
+  }
+
   return (
-    <div className="flex flex-col gap-3">
+    <Accordion variant="surface">
       {sorted.map((summary) => {
         const IconComponent =
           CATEGORY_ICONS[summary.category.icon] ?? CATEGORY_ICON_FALLBACK;
         const percentage = total > 0 ? (summary.totalSpent / total) * 100 : 0;
-        const content = (
-          <Card.Content className="flex flex-col gap-2 p-3">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent/10">
-                <IconComponent size={20} className="text-accent" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="truncate font-medium">
-                    {summary.category.name}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {summary.projectedOverspend && (
-                      <AlertTriangle size={16} className="text-warning" />
-                    )}
-                    <span className="font-semibold">
-                      ¥{summary.totalSpent.toLocaleString()}
+        const txs = txByCategory.get(summary.category.id) ?? [];
+        return (
+          <Accordion.Item key={summary.category.id} id={summary.category.id}>
+            <Accordion.Heading>
+              <Accordion.Trigger>
+                <div className="flex w-full flex-col gap-2 pr-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/10">
+                      <IconComponent size={18} className="text-accent" />
+                    </div>
+                    <span className="flex-1 truncate text-left text-sm font-semibold text-foreground">
+                      {summary.category.name}
                     </span>
+                    <span className="text-xs text-muted">
+                      {txs.length}笔
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {summary.projectedOverspend && (
+                        <AlertTriangle size={14} className="text-warning" />
+                      )}
+                      <span className="text-sm font-semibold tabular-nums">
+                        ¥{summary.totalSpent.toLocaleString()}
+                      </span>
+                      <span className="ml-1 text-xs font-normal text-muted">
+                        ({percentage.toFixed(1)}%)
+                      </span>
+                    </div>
                   </div>
+                  {summary.budget !== null && summary.percentUsed !== null && (
+                    <ProgressBar
+                      size="sm"
+                      value={Math.min(summary.percentUsed, 100)}
+                      color={summary.projectedOverspend ? "warning" : "accent"}
+                      aria-label={`${summary.category.name} budget usage`}
+                    />
+                  )}
                 </div>
-                <span className="text-sm text-muted">
-                  {percentage.toFixed(1)}%
-                </span>
-              </div>
-            </div>
-            {summary.budget !== null && summary.percentUsed !== null && (
-              <ProgressBar
-                size="sm"
-                value={Math.min(summary.percentUsed, 100)}
-                color={summary.projectedOverspend ? "warning" : "accent"}
-                aria-label={`${summary.category.name} budget usage`}
-              />
-            )}
-          </Card.Content>
-        );
+                <Accordion.Indicator>
+                  <ChevronDown />
+                </Accordion.Indicator>
+              </Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <Accordion.Body className="p-0">
+                {/* Budget row + edit link */}
+                <div className="flex items-center justify-between gap-3 border-b border-separator px-3 py-2 text-xs">
+                  <span className="text-muted">
+                    {summary.budget !== null
+                      ? `预算 ¥${summary.budget.toLocaleString()}`
+                      : "未设预算"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onEditBudget(summary.category.id)}
+                    className="text-accent active:scale-95 transition-transform"
+                  >
+                    修改预算
+                  </button>
+                </div>
 
-        if (onCategoryTap) {
-          return (
-            <button
-              key={summary.category.id}
-              type="button"
-              onClick={() => onCategoryTap(summary.category.id)}
-              className="w-full text-left transition-transform active:scale-[0.99]"
-            >
-              <Card>{content}</Card>
-            </button>
-          );
-        }
-        return <Card key={summary.category.id}>{content}</Card>;
+                {/* Transactions — tap to edit */}
+                {txs.length === 0 ? (
+                  <p className="px-3 py-4 text-center text-xs text-muted">
+                    本月暂无记录
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-separator">
+                    {txs.map((tx) => (
+                      <li key={tx.id}>
+                        <button
+                          type="button"
+                          onClick={() => onEditTx(tx)}
+                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-default active:bg-default"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm text-foreground">
+                              {tx.notes || <span className="text-muted">—</span>}
+                            </p>
+                            <p className="text-xs text-muted">{tx.date}</p>
+                          </div>
+                          <span className="shrink-0 text-sm font-medium tabular-nums">
+                            {currencySymbol(tx.currency)}
+                            {tx.amount.toLocaleString()}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Accordion.Body>
+            </Accordion.Panel>
+          </Accordion.Item>
+        );
       })}
-    </div>
+    </Accordion>
   );
+}
+
+function currencySymbol(c: "JPY" | "USD" | "CNY"): string {
+  return c === "USD" ? "$" : "¥";
 }

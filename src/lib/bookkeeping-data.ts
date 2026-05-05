@@ -134,6 +134,54 @@ export async function createSpendingTransaction(
   };
 }
 
+/**
+ * Update a subset of fields on an existing spending transaction and return
+ * the refreshed row. Pass only the fields that changed — anything omitted
+ * is left alone in the DB.
+ */
+export async function updateSpendingTransaction(
+  id: string,
+  fields: Partial<Omit<SpendingTransaction, "id" | "createdAt">>
+): Promise<SpendingTransaction> {
+  const supabase = createClient();
+
+  const payload: Record<string, unknown> = {};
+  if (fields.categoryId !== undefined) payload.category_id = fields.categoryId;
+  if (fields.amount !== undefined) payload.amount = fields.amount;
+  if (fields.currency !== undefined) payload.currency = fields.currency;
+  if (fields.date !== undefined) payload.date = fields.date;
+  if (fields.notes !== undefined) payload.notes = fields.notes;
+
+  const { data, error } = await supabase
+    .from("spending_transactions")
+    .update(payload)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    categoryId: data.category_id,
+    amount: data.amount,
+    currency: data.currency,
+    date: data.date,
+    notes: data.notes,
+    createdAt: data.created_at,
+  };
+}
+
+/** Delete a spending transaction by id. */
+export async function deleteSpendingTransaction(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("spending_transactions")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
 /** Fetch all category budgets (shared across the household). */
 export async function getCategoryBudgets(): Promise<CategoryBudget[]> {
   const supabase = createClient();

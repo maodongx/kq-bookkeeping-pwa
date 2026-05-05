@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@heroui/react";
+import { Button, toast } from "@heroui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { SpendingLineChart } from "./SpendingLineChart";
 import { CategoryBreakdown } from "./CategoryBreakdown";
 import { BudgetSettingsModal } from "./BudgetSettingsModal";
+import { QuickEntryModal } from "./QuickEntryModal";
 import {
   SPENDING_CATEGORIES,
   calculateBudgetWarning,
+  deleteSpendingTransaction,
   getCategoryBudgets,
   getSpendingTransactions,
+  updateSpendingTransaction,
 } from "@/lib/bookkeeping-data";
 import { monthBoundariesLocal } from "@/lib/date";
 import type {
@@ -36,19 +39,22 @@ function computeSummaries(
     );
   }
 
-  return SPENDING_CATEGORIES.filter((cat) => spendingMap.has(cat.id)).map(
+  // Return a summary for every category the user has either spent in OR
+  // set a budget for. A category with a budget but no spending yet still
+  // shows up so the user can see "0 / 60,000" progress.
+  const relevantCategoryIds = new Set<string>([
+    ...spendingMap.keys(),
+    ...budgetMap.keys(),
+  ]);
+
+  return SPENDING_CATEGORIES.filter((cat) => relevantCategoryIds.has(cat.id)).map(
     (cat) => {
       const spent = spendingMap.get(cat.id) ?? 0;
       const budget = budgetMap.get(cat.id);
       const budgetAmount = budget?.monthlyBudget ?? null;
       const percentUsed = budgetAmount ? (spent / budgetAmount) * 100 : null;
       const warningLevel = budgetAmount
-        ? calculateBudgetWarning(
-            spent,
-            budgetAmount,
-            dayOfMonth,
-            daysInMonth
-          )
+        ? calculateBudgetWarning(spent, budgetAmount, dayOfMonth, daysInMonth)
         : "none";
 
       return {
@@ -70,8 +76,11 @@ export function AnalyticsClient() {
   const [transactions, setTransactions] = useState<SpendingTransaction[]>([]);
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] =
+  // Budget-editing state — which category is having its monthly budget edited.
+  const [editingBudgetCategory, setEditingBudgetCategory] =
     useState<SpendingCategory | null>(null);
+  // Transaction-editing state — which existing tx is open in the modal.
+  const [editingTx, setEditingTx] = useState<SpendingTransaction | null>(null);
 
   const { startDate, endDate, daysInMonth } = monthBoundariesLocal(year, month);
   const isCurrentMonth =
@@ -94,9 +103,6 @@ export function AnalyticsClient() {
           setBudgets(bgs);
         }
       } catch (error) {
-        // Don't silently swallow — log for devtools. Analytics has no
-        // write path, so there's no toast to show; empty state below is
-        // what the user sees.
         console.error("Failed to fetch analytics data:", error);
       } finally {
         if (!cancelled) setLoading(false);
@@ -133,8 +139,11 @@ export function AnalyticsClient() {
     dayOfMonth,
     daysInMonth
   );
-  const selectedBudget = selectedCategory
-    ? (budgets.find((b) => b.categoryId === selectedCategory.id) ?? null)
+  const editingTxCategory = editingTx
+    ? (SPENDING_CATEGORIES.find((c) => c.id === editingTx.categoryId) ?? null)
+    : null;
+  const editingBudget = editingBudgetCategory
+    ? (budgets.find((b) => b.categoryId === editingBudgetCategory.id) ?? null)
     : null;
 
   const handleBudgetSave = (saved: CategoryBudget) => {
@@ -149,9 +158,49 @@ export function AnalyticsClient() {
     });
   };
 
-  const handleCategoryTap = (categoryId: string) => {
+  const handleEditBudget = (categoryId: string) => {
     const cat = SPENDING_CATEGORIES.find((c) => c.id === categoryId);
-    if (cat) setSelectedCategory(cat);
+    if (cat) setEditingBudgetCategory(cat);
+  };
+
+  const handleUpdateTx = async (entry: {
+    categoryId: string;
+    amount: number;
+    currency: "JPY" | "USD" | "CNY";
+    date: string;
+    notes: string | null;
+  }) => {
+    if (!editingTx) return;
+    try {
+      const saved = await updateSpendingTransaction(editingTx.id, {
+        categoryId: entry.categoryId,
+        amount: entry.amount,
+        currency: entry.currency,
+        date: entry.date,
+        notes: entry.notes,
+      });
+      // Local in-place update — avoids a refetch + loading flash.
+      setTransactions((prev) =>
+        prev.map((t) => (t.id === saved.id ? saved : t))
+      );
+      toast.success("已保存");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "未知错误";
+      toast.danger("保存失败", { description: message });
+    }
+  };
+
+  const handleDeleteTx = async () => {
+    if (!editingTx) return;
+    const id = editingTx.id;
+    try {
+      await deleteSpendingTransaction(id);
+      setTransactions((prev) => prev.filter((t) => t.id !== id));
+      toast.success("已删除");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "未知错误";
+      toast.danger("删除失败", { description: message });
+    }
   };
 
   return (
@@ -196,7 +245,9 @@ export function AnalyticsClient() {
           {summaries.length > 0 ? (
             <CategoryBreakdown
               summaries={summaries}
-              onCategoryTap={handleCategoryTap}
+              transactions={transactions}
+              onEditBudget={handleEditBudget}
+              onEditTx={(tx) => setEditingTx(tx)}
             />
           ) : (
             <p className="py-8 text-center text-muted">本月暂无支出记录</p>
@@ -204,13 +255,33 @@ export function AnalyticsClient() {
         </>
       )}
 
-      {selectedCategory && (
+      {/* Budget editor — per category */}
+      {editingBudgetCategory && (
         <BudgetSettingsModal
-          category={selectedCategory}
-          currentBudget={selectedBudget}
-          isOpen={!!selectedCategory}
-          onClose={() => setSelectedCategory(null)}
+          category={editingBudgetCategory}
+          currentBudget={editingBudget}
+          isOpen={!!editingBudgetCategory}
+          onClose={() => setEditingBudgetCategory(null)}
           onSave={handleBudgetSave}
+        />
+      )}
+
+      {/* Transaction editor — conditionally rendered with key so internal
+          state re-inits when switching between transactions. */}
+      {editingTx && editingTxCategory && (
+        <QuickEntryModal
+          key={editingTx.id}
+          category={editingTxCategory}
+          isOpen={!!editingTx}
+          onClose={() => setEditingTx(null)}
+          onSave={handleUpdateTx}
+          initialValues={{
+            amount: editingTx.amount,
+            currency: editingTx.currency,
+            date: editingTx.date,
+            notes: editingTx.notes,
+          }}
+          onDelete={handleDeleteTx}
         />
       )}
     </>
