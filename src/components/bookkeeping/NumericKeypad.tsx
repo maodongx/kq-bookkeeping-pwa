@@ -6,31 +6,37 @@ import { Delete } from "lucide-react";
 interface NumericKeypadProps {
   value: string;
   onChange: (value: string) => void;
-  onConfirm: () => void;
 }
 
 /**
- * Calculator-style keypad for amount entry. Max two decimal places; single
- * leading zero; single decimal point. Backspace deletes one char; `C`
- * clears.
+ * Phone-dialer-style numeric keypad for amount entry.
+ *
+ *   7 8 9
+ *   4 5 6
+ *   1 2 3
+ *   . 0 ⌫
+ *
+ * No clear button — tap backspace repeatedly if you need to wipe.
+ * Max two decimal places; single decimal point; tapping `.` on an
+ * empty value produces `0.` (not a bare `.`) for nicer UX.
+ *
+ * Amount display and action buttons are the parent's responsibility;
+ * this component is just the grid. That keeps QuickEntryModal free
+ * to lay out the pieces (amount readout, notes bar, date, confirm)
+ * without fighting the keypad's internal layout.
  */
-export function NumericKeypad({
-  value,
-  onChange,
-  onConfirm,
-}: NumericKeypadProps) {
+export function NumericKeypad({ value, onChange }: NumericKeypadProps) {
+  const BACKSPACE = "⌫";
+
   const handleKey = (key: string) => {
-    if (key === "C") {
-      onChange("");
-      return;
-    }
-    if (key === "⌫") {
+    if (key === BACKSPACE) {
       onChange(value.slice(0, -1));
       return;
     }
     if (key === ".") {
       if (value.includes(".")) return;
-      onChange(value + ".");
+      if (!value) onChange("0.");
+      else onChange(value + ".");
       return;
     }
     const parts = value.split(".");
@@ -42,44 +48,26 @@ export function NumericKeypad({
     onChange(value + key);
   };
 
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "."];
+  // Row-major phone-dialer order: 7-8-9 on top, `.` `0` `⌫` on bottom.
+  const keys = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", BACKSPACE];
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="min-h-[60px] px-2 py-4 text-right text-4xl font-semibold">
-        {value || "0"}
-      </div>
-      <div className="grid grid-cols-4 gap-2">
-        {keys.map((key) => (
+    <div className="grid grid-cols-3 gap-2">
+      {keys.map((key) => {
+        const isBackspace = key === BACKSPACE;
+        return (
           <Button
             key={key}
-            variant={key === "C" ? "tertiary" : "outline"}
+            variant={isBackspace ? "tertiary" : "outline"}
             size="lg"
             className="h-14 text-xl font-medium"
             onPress={() => handleKey(key)}
+            aria-label={isBackspace ? "删除" : key}
           >
-            {key}
+            {isBackspace ? <Delete className="size-6" /> : key}
           </Button>
-        ))}
-        <Button
-          variant="tertiary"
-          size="lg"
-          className="h-14"
-          onPress={() => handleKey("⌫")}
-          aria-label="删除"
-        >
-          <Delete className="size-6" />
-        </Button>
-      </div>
-      <Button
-        variant="primary"
-        size="lg"
-        className="mt-2 h-14 text-lg font-semibold"
-        onPress={onConfirm}
-        isDisabled={!value || value === "0" || value === "."}
-      >
-        确认
-      </Button>
+        );
+      })}
     </div>
   );
 }
