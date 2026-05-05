@@ -55,11 +55,25 @@ function formatSigned(value: number, currency: Currency): string {
   return `${sign}${formatCurrency(value, currency)}`;
 }
 
+/**
+ * "(42.1%)" of the total — one decimal, parens included. Returns an empty
+ * string when the denominator is non-positive so we don't print "(NaN%)"
+ * or "(Infinity%)" on the initial "no assets" render or if a weird
+ * net-negative case ever shows up.
+ */
+function formatShare(value: number, total: number): string {
+  if (total <= 0) return "";
+  return `(${((value / total) * 100).toFixed(1)}%)`;
+}
+
 export function AssetsClient({
   groups,
+  totalWealth,
   displayCurrency,
 }: {
   groups: CategoryGroup[];
+  /** Sum of all group totals in the display currency. */
+  totalWealth: number;
   displayCurrency: Currency;
 }) {
   return (
@@ -106,6 +120,9 @@ export function AssetsClient({
                   </div>
                   <span className="mr-3 text-sm font-semibold tabular-nums">
                     {formatCurrency(g.totalValue, displayCurrency)}
+                    <span className="ml-1 font-normal text-muted">
+                      {formatShare(g.totalValue, totalWealth)}
+                    </span>
                   </span>
                   <Accordion.Indicator>
                     <ChevronDown />

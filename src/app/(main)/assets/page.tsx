@@ -89,5 +89,15 @@ export default async function AssetsPage() {
     g.assets.sort((a, b) => b.valueInDisplay - a.valueInDisplay);
   }
 
-  return <AssetsClient groups={groups} displayCurrency={displayCurrency} />;
+  // Grand total in the display currency. Passed to the client so each row
+  // can show its share of total wealth without re-summing.
+  const totalWealth = groups.reduce((sum, g) => sum + g.totalValue, 0);
+
+  return (
+    <AssetsClient
+      groups={groups}
+      totalWealth={totalWealth}
+      displayCurrency={displayCurrency}
+    />
+  );
 }
