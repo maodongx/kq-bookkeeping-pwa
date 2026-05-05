@@ -1,5 +1,5 @@
 import { Asset, Transaction, AssetPriceSnapshot, ExchangeRateSnapshot, Currency } from "./types";
-import { hasPerAssetGainLoss, isInvestment } from "./currency";
+import { isInvestment } from "./currency";
 import { RateMap, convertCurrency } from "./exchange-rates";
 import { computeHolding } from "./asset-calculations";
 export type TimeRange = "1W" | "1M" | "3M" | "6M" | "1Y" | "ALL";
@@ -124,32 +124,4 @@ export function computeNetWorthTimeSeries(
     }, 0);
     return { date, netWorth };
   });
-}
-
-export interface GainLossItem {
-  name: string;
-  gainLoss: number;
-  gainPct: number;
-}
-
-export function computeGainLossPerAsset(
-  assets: Asset[],
-  transactions: Transaction[],
-  targetCurrency: Currency,
-  rates: RateMap
-): GainLossItem[] {
-  return assets
-    .filter((a) => hasPerAssetGainLoss(a.category))
-    .map((asset) => {
-      // Delegate to the canonical holding math so the bar chart and the
-      // per-asset detail page can never disagree about gain/loss.
-      const { gainLoss, gainPct } = computeHolding(asset, transactions);
-      return {
-        name: asset.name,
-        gainLoss: convertCurrency(gainLoss, asset.currency, targetCurrency, rates),
-        gainPct,
-      };
-    })
-    .filter((item) => item.gainLoss !== 0 || item.gainPct !== 0)
-    .sort((a, b) => b.gainLoss - a.gainLoss);
 }

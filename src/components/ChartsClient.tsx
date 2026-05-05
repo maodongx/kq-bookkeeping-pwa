@@ -3,17 +3,20 @@
 import { useState } from "react";
 import type { Key } from "@heroui/react";
 import { Card, ToggleButton, ToggleButtonGroup } from "@heroui/react";
-import { Asset, Transaction, AssetPriceSnapshot, ExchangeRateSnapshot, Currency } from "@/lib/types";
-import { RateMap } from "@/lib/exchange-rates";
+import {
+  Asset,
+  AssetPriceSnapshot,
+  Currency,
+  ExchangeRateSnapshot,
+  Transaction,
+} from "@/lib/types";
 import {
   TimeRange,
   TIME_RANGE_LABELS,
   computeNetWorthTimeSeries,
-  computeGainLossPerAsset,
 } from "@/lib/chart-utils";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { NetWorthLineChart } from "./NetWorthLineChart";
-import { GainLossBarChart } from "./GainLossBarChart";
 
 const TIME_RANGES: TimeRange[] = ["1W", "1M", "3M", "6M", "1Y", "ALL"];
 
@@ -22,14 +25,12 @@ export function ChartsClient({
   transactions,
   priceSnapshots,
   rateSnapshots,
-  rates,
   defaultCurrency,
 }: {
   assets: Asset[];
   transactions: Transaction[];
   priceSnapshots: AssetPriceSnapshot[];
   rateSnapshots: ExchangeRateSnapshot[];
-  rates: RateMap;
   defaultCurrency: Currency;
 }) {
   const [currency, setCurrency] = useState<Currency>(defaultCurrency);
@@ -42,13 +43,6 @@ export function ChartsClient({
     rateSnapshots,
     currency,
     range
-  );
-
-  const gainLossData = computeGainLossPerAsset(
-    assets,
-    transactions,
-    currency,
-    rates
   );
 
   return (
@@ -80,7 +74,6 @@ export function ChartsClient({
       </div>
 
       <NetWorthLineChart data={timeSeries} currency={currency} />
-      <GainLossBarChart data={gainLossData} currency={currency} />
 
       {assets.length === 0 && (
         <Card className="p-8 text-center">

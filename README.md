@@ -18,7 +18,7 @@ This is a personal project, not a public product. The design goals are:
 - Live price fetching for US stocks (Yahoo), MUFG / Rakuten JP funds, CN funds (Tiantian)
 - Exchange rates auto-refreshed on dashboard load
 - Dashboard with net worth, 累计盈亏 / 近1月 / 年化 stats, allocation pie charts by tag and by risk level
-- Charts page: net worth line chart (1W / 1M / 3M / 6M / 1Y / ALL) and per-asset gain/loss bars
+- Charts page: net worth line chart (1W / 1M / 3M / 6M / 1Y / ALL)
 - JSON export / import with merge and replace modes
 - PWA with a purple cat icon and a hand-rolled service worker
 - Asian finance color convention throughout (red = gain, green = loss)
@@ -114,7 +114,6 @@ src/
 │   ├── ExportButton.tsx
 │   ├── ImportSection.tsx          # ToggleButtonGroup for merge/replace
 │   ├── NetWorthLineChart.tsx      # Recharts AreaChart
-│   ├── GainLossBarChart.tsx       # Recharts horizontal BarChart
 │   ├── AllocationPieChart.tsx     # Donut with Chip legend
 │   ├── StatCard.tsx               # Small label+value summary card
 │   ├── LabelValueRow.tsx          # Label ↔ value row inside a card
@@ -124,7 +123,7 @@ src/
 │   └── ui/native-select.tsx       # The only remaining <select> wrapper
 ├── lib/
 │   ├── asset-calculations.ts      # computeHolding() — single source of truth
-│   ├── chart-utils.ts             # Time series + per-asset gain/loss
+│   ├── chart-utils.ts             # Net worth time series
 │   ├── currency.ts                # Formatters, labels, color helpers
 │   ├── date.ts                    # todayLocal / todayUTC / todayTokyoCompact
 │   ├── exchange-rates.ts          # fetchLatestRates, convertCurrency
@@ -169,7 +168,7 @@ All computed values (market value, total cost, gain/loss, balance) are derived a
 ## Conventions
 
 - **Commit style**: Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `perf:`, `docs:`, `style:`). Subject imperative, ≤50 chars. Body wraps at 72. Separate subject from body with a blank line.
-- **Color convention**: Asian finance — red = gain, green = loss. Use `gainLossTextClass()` and `gainLossFill()` from `lib/currency.ts`; never hardcode colors. Risk levels use a separate palette (green / yellow / orange) so `高风险` doesn't collide with red-means-gain.
+- **Color convention**: Asian finance — red = gain, green = loss. Use `gainLossTextClass()` from `lib/currency.ts`; never hardcode colors. Risk levels use a separate palette (green / yellow / orange) so `高风险` doesn't collide with red-means-gain.
 - **Segmented toggles**: use HeroUI `ToggleButtonGroup`, not `Tabs`. Tabs are for navigation only (see `BottomTabBar`). The transaction type picker, currency picker, import mode picker, and time range picker all use `ToggleButtonGroup`.
 - **Confirmations**: `useConfirmDialog()` + `<ConfirmDialog />`, never `window.confirm()`. Toasts: `toast.success/warning/danger`, never `alert()`.
 - **Date handling**: `src/lib/date.ts` helpers (`todayLocal` / `todayUTC` / `todayTokyoCompact`). Never inline `new Date().toISOString().split("T")[0]` — the choice of UTC vs. local matters and should be explicit.
