@@ -1,36 +1,185 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# KQ Bookkeeping
 
-## Getting Started
+A personal multi-currency bookkeeping PWA for two users (husband + wife). Tracks assets, transactions, market prices, and exchange rates across USD / JPY / CNY, with a Chinese UI.
 
-First, run the development server:
+- **Live**: https://kq-bookkeeping-pwa.vercel.app/
+- **Repo**: https://github.com/maodongx/kq-bookkeeping-pwa
+
+This is a personal project, not a public product. The design goals are:
+
+1. **Free to run** — no paid services; every tier used is on the vendor's free plan.
+2. **Zero friction** — install to home screen, stay logged in for 30 days, no third-party OAuth.
+3. **Works on phones and desktops** — a PWA rather than a native app, so both users get updates instantly via URL.
+
+## Features
+
+- Add assets in 6 categories: US stocks, JP funds, CN funds, bank deposits, cash, other
+- Transactions with five types: buy, sell, deposit, withdraw, adjustment
+- Live price fetching for US stocks (Yahoo), MUFG / Rakuten JP funds, CN funds (Tiantian)
+- Exchange rates auto-refreshed on dashboard load
+- Dashboard with net worth, 累计盈亏 / 近1月 / 年化 stats, allocation pie charts by tag and by risk level
+- Charts page: net worth line chart (1W / 1M / 3M / 6M / 1Y / ALL) and per-asset gain/loss bars
+- JSON export / import with merge and replace modes
+- PWA with a purple cat icon and a hand-rolled service worker
+- Asian finance color convention throughout (red = gain, green = loss)
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 App Router |
+| Language | TypeScript (ES2022 target, strict mode) |
+| Styling | Tailwind CSS 4 |
+| UI | HeroUI v3 (`@heroui/react`) |
+| Charts | Recharts |
+| Icons | Lucide React |
+| Database | Supabase PostgreSQL (free tier, Tokyo region) |
+| Auth | Supabase email + password, 30-day sessions |
+| Hosting | Vercel (free tier, auto-deploy on push) |
+| CI/CD | GitHub → Vercel (~30s) |
+| Total monthly cost | $0 |
+
+## Prerequisites
+
+- Node 20 (pinned in `.node-version`). On macOS with Homebrew: `brew install node@20` and use `/opt/homebrew/opt/node@20/bin` in `PATH`.
+- A Supabase project. Set up the schema from `supabase/migrations/*.sql` in order via the Supabase SQL Editor.
+
+## Local Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/maodongx/kq-bookkeeping-pwa.git
+cd kq-bookkeeping-pwa
+
+# .npmrc in this repo forces the public npm registry.
+# Do not delete it — your shell's default registry may be something else.
+npm install
+
+# Create .env.local with your Supabase project credentials
+cat > .env.local <<EOF
+NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+EOF
+
+npm run dev   # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Scripts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev      # Dev server with Turbopack
+npm run build    # Production build (runs tsc + bundling + static page gen)
+npm run start    # Serve the production build
+npm run lint     # ESLint flat config (Next core-web-vitals + TS)
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+There is no test runner configured. `npm run build` and `npm run lint` must both be clean before a commit.
 
-## Learn More
+## Project Layout
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/
+│   ├── (main)/                    # Auth-gated route group with tab bar
+│   │   ├── layout.tsx             # Redirects to /login if not authed
+│   │   ├── page.tsx               # Dashboard (总览) — server component
+│   │   ├── assets/
+│   │   │   ├── page.tsx           # Asset list grouped by category
+│   │   │   ├── add/page.tsx       # Client form, reuses AssetForm
+│   │   │   ├── [id]/page.tsx      # Asset detail + transaction history
+│   │   │   └── [id]/edit/page.tsx # Client form, reuses AssetForm
+│   │   ├── charts/page.tsx        # Analysis page (server → ChartsClient)
+│   │   └── settings/page.tsx      # Currency preference, export/import, sign out
+│   ├── api/
+│   │   ├── prices/route.ts        # Proxies Yahoo / MUFG / Rakuten / Tiantian
+│   │   ├── exchange-rates/route.ts
+│   │   ├── export/route.ts        # Returns JSON attachment
+│   │   ├── import/route.ts        # mode=merge|replace
+│   │   └── auth/signout/route.ts
+│   ├── login/page.tsx             # Email + password form
+│   ├── layout.tsx                 # Root layout, Toast.Provider, service worker
+│   └── globals.css                # Tailwind import + HeroUI finances theme tokens
+├── components/
+│   ├── DashboardClient.tsx        # Interactive dashboard, currency switcher
+│   ├── ChartsClient.tsx           # Interactive charts, time range picker
+│   ├── AssetForm.tsx              # Shared add/edit asset form (mode prop)
+│   ├── TransactionList.tsx        # Manages edit-mode state per row
+│   ├── TransactionRow.tsx         # Inline-editable single transaction
+│   ├── AddTransactionForm.tsx
+│   ├── UpdateBalanceForm.tsx      # For deposit/cash (not investments)
+│   ├── EditPriceButton.tsx        # Inline price edit on asset detail
+│   ├── RefreshPricesButton.tsx
+│   ├── BottomTabBar.tsx           # Lavender nav bar, 4 tabs
+│   ├── CurrencySwitcher.tsx       # ToggleButtonGroup (single selection)
+│   ├── CurrencyPreferencePicker.tsx
+│   ├── ExportButton.tsx
+│   ├── ImportSection.tsx          # ToggleButtonGroup for merge/replace
+│   ├── NetWorthLineChart.tsx      # Recharts AreaChart
+│   ├── GainLossBarChart.tsx       # Recharts horizontal BarChart
+│   ├── AllocationPieChart.tsx     # Donut with Chip legend
+│   ├── StatCard.tsx               # Small label+value summary card
+│   ├── LabelValueRow.tsx          # Label ↔ value row inside a card
+│   ├── ConfirmDialog.tsx          # useConfirmDialog hook + AlertDialog
+│   ├── DeleteAssetButton.tsx
+│   ├── ServiceWorkerRegister.tsx
+│   └── ui/native-select.tsx       # The only remaining <select> wrapper
+├── lib/
+│   ├── asset-calculations.ts      # computeHolding() — single source of truth
+│   ├── chart-utils.ts             # Time series + per-asset gain/loss
+│   ├── currency.ts                # Formatters, labels, color helpers
+│   ├── date.ts                    # todayLocal / todayUTC / todayTokyoCompact
+│   ├── exchange-rates.ts          # fetchLatestRates, convertCurrency
+│   ├── prices.ts                  # Client helper to refresh both APIs
+│   ├── supabase/
+│   │   ├── client.ts              # Browser client
+│   │   ├── server.ts              # Server client (cookies)
+│   │   └── middleware.ts          # Session refresh + auth redirects
+│   ├── types.ts                   # All domain TypeScript interfaces
+│   └── utils.ts                   # cn()
+└── proxy.ts                       # Next.js 16's renamed middleware entry
+supabase/
+└── migrations/                    # Run manually in the SQL editor
+public/
+├── manifest.json                  # PWA manifest
+├── sw.js                          # Hand-written service worker
+└── icons/                         # 192 / 512 / maskable / apple-touch
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Data Model
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Four tables in PostgreSQL:
 
-## Deploy on Vercel
+```sql
+assets (id, name, category, currency, symbol, fund_provider, tag,
+        risk_level, note, current_price, last_price_update, created_at)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+transactions (id, asset_id FK, type, quantity, price, amount, date,
+              note, created_at)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+asset_price_snapshots (id, asset_id FK, price, date)
+  UNIQUE (asset_id, date)
+
+exchange_rate_snapshots (id, base_currency, target_currency, rate, date)
+  UNIQUE (base_currency, target_currency, date)
+```
+
+Enums are enforced via `CHECK` constraints. RLS policy is "authenticated users see everything" — this is a shared-household app, not a multi-tenant product.
+
+All computed values (market value, total cost, gain/loss, balance) are derived at render time from transactions via `computeHolding()`. There are no denormalized summary columns.
+
+## Conventions
+
+- **Commit style**: Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `perf:`, `docs:`, `style:`). Subject imperative, ≤50 chars. Body wraps at 72. Separate subject from body with a blank line.
+- **Color convention**: Asian finance — red = gain, green = loss. Use `gainLossTextClass()` and `gainLossFill()` from `lib/currency.ts`; never hardcode colors. Risk levels use a separate palette (green / yellow / orange) so `高风险` doesn't collide with red-means-gain.
+- **Segmented toggles**: use HeroUI `ToggleButtonGroup`, not `Tabs`. Tabs are for navigation only (see `BottomTabBar`).
+- **Confirmations**: `useConfirmDialog()` + `<ConfirmDialog />`, never `window.confirm()`. Toasts: `toast.success/warning/danger`, never `alert()`.
+- **Date handling**: `src/lib/date.ts` helpers (`todayLocal` / `todayUTC` / `todayTokyoCompact`). Never inline `new Date().toISOString().split("T")[0]` — the choice of UTC vs. local matters and should be explicit.
+- **Holding math**: exactly one function — `computeHolding(asset, transactions)` — returns everything needed. Do not inline reducers.
+- **HeroUI components**: imported directly from `@heroui/react`, never behind a local wrapper. The one exception is `NativeSelect`, which is intentionally a plain `<select>` because iOS's native wheel picker is a better mobile UX than any JS component.
+
+## Deployment
+
+Push to `main` on GitHub → Vercel picks it up → build & deploy in ~30s. Environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) are set in the Vercel project settings.
+
+## License
+
+MIT. See `AGENTS.md` for project context and `CLAUDE.md` / `HEROUI.md` for codebase conventions when working with AI assistants.
