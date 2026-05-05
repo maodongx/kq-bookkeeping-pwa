@@ -1,6 +1,7 @@
 import { Asset, Transaction, AssetPriceSnapshot, ExchangeRateSnapshot, Currency } from "./types";
 import { isInvestment } from "./currency";
 import { RateMap, convertCurrency } from "./exchange-rates";
+import { computeHolding } from "./asset-calculations";
 
 export type TimeRange = "1W" | "1M" | "3M" | "6M" | "1Y" | "ALL";
 
@@ -143,23 +144,9 @@ export function computeGainLossPerAsset(
   return assets
     .filter((a) => isInvestment(a.category))
     .map((asset) => {
-      const txs = transactions.filter((tx) => tx.asset_id === asset.id);
-      const totalQty = txs.reduce((sum, tx) => {
-        if (tx.type === "buy") return sum + tx.quantity;
-        if (tx.type === "sell") return sum - tx.quantity;
-        return sum;
-      }, 0);
-      const totalCost = txs.reduce((sum, tx) => {
-        if (tx.type === "buy") return sum + tx.amount;
-        if (tx.type === "sell") return sum - tx.amount;
-        return sum;
-      }, 0);
-      const marketValue = asset.current_price
-        ? totalQty * asset.current_price
-        : 0;
-      const gainLoss = marketValue - totalCost;
-      const gainPct = totalCost > 0 ? (gainLoss / totalCost) * 100 : 0;
-
+      // Delegate to the canonical holding math so the bar chart and the
+      // per-asset detail page can never disagree about gain/loss.
+      const { gainLoss, gainPct } = computeHolding(asset, transactions);
       return {
         name: asset.name,
         gainLoss: convertCurrency(gainLoss, asset.currency, targetCurrency, rates),

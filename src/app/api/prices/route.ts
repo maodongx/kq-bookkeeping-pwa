@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { Asset } from "@/lib/types";
+import { todayUTC, todayTokyoCompact } from "@/lib/date";
 
 interface PriceResult {
   assetId: string;
@@ -59,9 +60,7 @@ async function fetchYahooJPToken(fundCode: string): Promise<string> {
 
 async function fetchRakutenFundPrice(fundCode: string): Promise<number> {
   const jwt = await fetchYahooJPToken(fundCode);
-  const today = new Date()
-    .toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" })
-    .replace(/-/g, "");
+  const today = todayTokyoCompact();
   const url = `https://finance.yahoo.co.jp/bff-pc/v1/main/fund/chart/history/${encodeURIComponent(fundCode)}?fromDate=&size=2&timeFrame=daily&toDate=${today}`;
   const res = await fetch(url, {
     headers: { "User-Agent": BROWSER_UA, "jwt-token": jwt },
@@ -80,7 +79,7 @@ async function fetchRakutenFundPrice(fundCode: string): Promise<number> {
 }
 
 async function fetchCNFundPrice(fundCode: string): Promise<number> {
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const today = todayUTC().replace(/-/g, "");
   const url = `https://fundgz.1234567.com.cn/js/${encodeURIComponent(fundCode)}.js?rt=${today}`;
   const res = await fetch(url, {
     headers: { "User-Agent": "Mozilla/5.0" },

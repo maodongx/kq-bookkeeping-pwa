@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AssetCategory, TransactionType } from "@/lib/types";
 import { getAvailableTxTypes, TX_TYPE_LABELS, isInvestment } from "@/lib/currency";
+import { todayLocal } from "@/lib/date";
 import { Card, Button, Input, toast } from "@heroui/react";
 
 export function AddTransactionForm({
@@ -21,7 +22,7 @@ export function AddTransactionForm({
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(todayLocal());
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
 

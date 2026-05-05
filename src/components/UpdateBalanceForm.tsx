@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Currency } from "@/lib/types";
 import { formatCurrency, CURRENCY_SYMBOLS } from "@/lib/currency";
+import { todayLocal } from "@/lib/date";
 import { Card, Button, Input, toast } from "@heroui/react";
 
 export function UpdateBalanceForm({
@@ -42,7 +43,7 @@ export function UpdateBalanceForm({
       quantity: Math.abs(diff),
       price: 1,
       amount: diff,
-      date: new Date().toISOString().split("T")[0],
+      date: todayLocal(),
       note: note.trim() || `余额更新: ${formatCurrency(currentBalance, currency)} → ${formatCurrency(newBalance, currency)}`,
     });
 

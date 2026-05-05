@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { Asset, Transaction } from "@/lib/types";
 import { formatCurrency, CATEGORY_LABELS, RISK_LABELS, isInvestment, gainLossTextClass } from "@/lib/currency";
 import { computeHolding } from "@/lib/asset-calculations";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Card, Chip } from "@heroui/react";
 import { DeleteAssetButton } from "@/components/DeleteAssetButton";
@@ -10,6 +9,7 @@ import { AddTransactionForm } from "@/components/AddTransactionForm";
 import { UpdateBalanceForm } from "@/components/UpdateBalanceForm";
 import { EditPriceButton } from "@/components/EditPriceButton";
 import { TransactionList } from "@/components/TransactionList";
+import { LabelValueRow } from "@/components/LabelValueRow";
 
 export default async function AssetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -61,9 +61,9 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
 
       <Card>
         <Card.Content className="space-y-2 text-sm">
-          {inv && <Row label="持有数量" value={totalQty.toFixed(4)} />}
+          {inv && <LabelValueRow label="持有数量" value={totalQty.toFixed(4)} />}
           {inv && (
-            <Row
+            <LabelValueRow
               label="平均成本"
               value={totalQty > 0 ? formatCurrency(totalCost / totalQty, a.currency) : "-"}
             />
@@ -74,12 +74,12 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
               <EditPriceButton assetId={a.id} currentPrice={a.current_price} currency={a.currency} />
             </div>
           )}
-          <Row
+          <LabelValueRow
             label={inv ? "市值" : "余额"}
             value={formatCurrency(marketValue, a.currency)}
           />
           {inv && (
-            <Row
+            <LabelValueRow
               label="盈亏"
               value={`${formatCurrency(gainLoss, a.currency)} (${gainLoss >= 0 ? "+" : ""}${gainPct.toFixed(2)}%)`}
               className={gainLossTextClass(gainLoss)}
@@ -95,23 +95,6 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
       )}
 
       <TransactionList transactions={txList} category={a.category} currency={a.currency} />
-    </div>
-  );
-}
-
-function Row({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-muted">{label}</span>
-      <span className={cn("font-mono", className)}>{value}</span>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { todayUTC } from "@/lib/date";
 
 export async function GET() {
   const supabase = await createClient();
@@ -32,7 +33,7 @@ export async function GET() {
     exchangeRateSnapshots: exchangeRateSnapshots || [],
   };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayUTC();
 
   return new NextResponse(JSON.stringify(payload, null, 2), {
     headers: {

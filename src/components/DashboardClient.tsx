@@ -16,11 +16,11 @@ import { formatCurrency, RISK_LABELS, RISK_COLORS, gainLossTextClass } from "@/l
 import { RateMap, convertCurrency, totalNetWorth } from "@/lib/exchange-rates";
 import { computeNetWorthTimeSeries } from "@/lib/chart-utils";
 import { refreshAllPrices } from "@/lib/prices";
-import { cn } from "@/lib/utils";
 import { Card } from "@heroui/react";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { AllocationPieChart } from "./AllocationPieChart";
 import { RefreshPricesButton } from "./RefreshPricesButton";
+import { StatCard } from "./StatCard";
 
 /**
  * Risk-level palette lives in lib/currency.ts as RISK_COLORS so that any
@@ -217,43 +217,29 @@ export function DashboardClient({
 
       {assets.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
-          <Card className="py-1 text-center">
-            <Card.Content>
-              <p className="text-xs text-muted">累计盈亏</p>
-              <p className={cn(
-                "text-sm font-semibold tabular-nums",
-                gainLossTextClass(totalGain)
-              )}>
-                {formatCurrency(totalGain, currency)}
-              </p>
-            </Card.Content>
-          </Card>
-          <Card className="py-1 text-center">
-            <Card.Content>
-              <p className="text-xs text-muted">近1月</p>
-              <p className={cn(
-                "text-sm font-semibold tabular-nums",
-                gainLossTextClass(monthChangePct ?? 0)
-              )}>
-                {monthChangePct != null
-                  ? `${monthChangePct >= 0 ? "+" : ""}${monthChangePct.toFixed(2)}%`
-                  : "—"}
-              </p>
-            </Card.Content>
-          </Card>
-          <Card className="py-1 text-center">
-            <Card.Content>
-              <p className="text-xs text-muted">年化</p>
-              <p className={cn(
-                "text-sm font-semibold tabular-nums",
-                gainLossTextClass(annualizedPct ?? 0)
-              )}>
-                {annualizedPct != null
-                  ? `${annualizedPct >= 0 ? "+" : ""}${annualizedPct.toFixed(2)}%`
-                  : "—"}
-              </p>
-            </Card.Content>
-          </Card>
+          <StatCard
+            label="累计盈亏"
+            value={formatCurrency(totalGain, currency)}
+            tone={gainLossTextClass(totalGain)}
+          />
+          <StatCard
+            label="近1月"
+            value={
+              monthChangePct != null
+                ? `${monthChangePct >= 0 ? "+" : ""}${monthChangePct.toFixed(2)}%`
+                : "—"
+            }
+            tone={gainLossTextClass(monthChangePct ?? 0)}
+          />
+          <StatCard
+            label="年化"
+            value={
+              annualizedPct != null
+                ? `${annualizedPct >= 0 ? "+" : ""}${annualizedPct.toFixed(2)}%`
+                : "—"
+            }
+            tone={gainLossTextClass(annualizedPct ?? 0)}
+          />
         </div>
       )}
 

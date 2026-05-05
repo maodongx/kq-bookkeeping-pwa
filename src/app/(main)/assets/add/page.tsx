@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@heroui/react";
+import { todayLocal } from "@/lib/date";
 import {
   AssetForm,
   AssetFormValues,
@@ -58,7 +59,7 @@ export default function AddAssetPage() {
         quantity: initialAmt,
         price: 1,
         amount: initialAmt,
-        date: new Date().toISOString().split("T")[0],
+        date: todayLocal(),
       });
     }
 
