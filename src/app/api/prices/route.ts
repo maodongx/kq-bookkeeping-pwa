@@ -138,7 +138,7 @@ export async function POST() {
   }
 
   const now = new Date().toISOString();
-  const today = now.slice(0, 10);
+  const today = todayUTC();
   const prices: PriceResult[] = [];
   const errors: PriceError[] = [];
 
@@ -162,18 +162,33 @@ export async function POST() {
     }
   }
 
-  for (const { assetId, price } of prices) {
-    await supabase
-      .from("assets")
-      .update({ current_price: price, last_price_update: now })
-      .eq("id", assetId);
+  // Persist in two concurrent batches:
+  //   1. Per-asset updates to `assets.current_price` + `last_price_update`
+  //      run in parallel (N queries but overlapped, not serialized).
+  //   2. A single bulk upsert into `asset_price_snapshots` writes every
+  //      day's snapshot in one round-trip.
+  // Previously we did `for (... of prices) { await update; await upsert }`
+  // which was 2N sequential round-trips to Supabase.
+  if (prices.length > 0) {
+    const assetUpdates = prices.map(({ assetId, price }) =>
+      supabase
+        .from("assets")
+        .update({ current_price: price, last_price_update: now })
+        .eq("id", assetId)
+    );
 
-    await supabase
-      .from("asset_price_snapshots")
-      .upsert(
-        { asset_id: assetId, price, date: today },
-        { onConflict: "asset_id,date" }
-      );
+    const snapshotRows = prices.map(({ assetId, price }) => ({
+      asset_id: assetId,
+      price,
+      date: today,
+    }));
+
+    await Promise.all([
+      Promise.all(assetUpdates),
+      supabase
+        .from("asset_price_snapshots")
+        .upsert(snapshotRows, { onConflict: "asset_id,date" }),
+    ]);
   }
 
   return NextResponse.json({ prices, errors });
