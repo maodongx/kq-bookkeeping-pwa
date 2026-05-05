@@ -122,7 +122,7 @@ export function AssetsClient({
                           className="flex items-start justify-between gap-3 p-3 transition-colors hover:bg-default"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">
+                            <p className="truncate text-base font-semibold">
                               {a.name}
                             </p>
                             <div className="mt-0.5 flex flex-wrap items-center gap-1">
