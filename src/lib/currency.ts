@@ -43,8 +43,9 @@ export const TX_TYPE_LABELS: Record<TransactionType, string> = {
 };
 
 export function getAvailableTxTypes(category: AssetCategory): TransactionType[] {
-  if (category === "usStock" || category === "jpFund" || category === "cnFund") return ["buy", "sell"];
-  return ["deposit", "withdraw", "adjustment"];
+  return isInvestment(category)
+    ? ["buy", "sell"]
+    : ["deposit", "withdraw", "adjustment"];
 }
 
 export function isInvestment(category: AssetCategory): boolean {

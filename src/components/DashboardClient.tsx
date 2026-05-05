@@ -22,8 +22,6 @@ import { AllocationPieChart } from "./AllocationPieChart";
 import { RefreshPricesButton } from "./RefreshPricesButton";
 import { StatCard } from "./StatCard";
 
-export type { DashboardAsset } from "@/lib/dashboard-stats";
-
 /** "+3.21%", "-1.05%", or "—" when the percentage is not available. */
 function fmtPct(pct: number | null): string {
   if (pct == null) return "—";
