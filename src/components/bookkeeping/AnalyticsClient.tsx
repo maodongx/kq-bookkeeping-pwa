@@ -44,6 +44,14 @@ import type {
 export type ViewMode = "monthly" | "annual";
 
 /**
+ * How long to suppress the warning-cat popup after the user taps
+ * 知道了 to acknowledge. After this window elapses, the popup is
+ * eligible to appear again on the next /analytics open.
+ */
+const WARNING_ACK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
+const WARNING_ACK_STORAGE_KEY = "kq:analytics-warning-acked-at";
+
+/**
  * Sum transaction amounts into the display currency. Each row is
  * converted from its native currency before summing so the total is
  * meaningful when the rows mix JPY / USD / CNY.
@@ -198,13 +206,11 @@ export function AnalyticsClient({
     useState<SpendingCategory | null>(null);
   // Transaction-editing state — which existing tx is open in the modal.
   const [editingTx, setEditingTx] = useState<SpendingTransaction | null>(null);
-  // Budget-warning cat popup: track user dismissals by month key and
-  // persist across page navigation within the session via sessionStorage.
-  // Derived visibility (below) rather than stored, so we don't violate
-  // the "no setState in effect" rule.
-  const [dismissedMonthKey, setDismissedMonthKey] = useState<string | null>(
-    null
-  );
+  // Budget-warning cat popup — computed in a mount effect below so that
+  // we can reference `Date.now()` and `localStorage` without violating
+  // React Compiler's purity rules for render.
+  const [warningCatLevel, setWarningCatLevel] =
+    useState<WarningModalLevel | null>(null);
 
   const { startDate, endDate, daysInMonth } = monthBoundariesLocal(year, month);
   const isCurrentMonth =
@@ -316,15 +322,25 @@ export function AnalyticsClient({
     }
   }
 
-  // Derive modal visibility from: (a) a warning exists, (b) data loaded,
-  // (c) user hasn't dismissed this month during the current mount. No
-  // sessionStorage persistence — the popup is a nudge, and the user
-  // wants to see it every time they open the page.
-  const monthKey = `${year}-${month}`;
-  const warningCatLevel: WarningModalLevel | null =
-    !loading && highestWarning !== null && dismissedMonthKey !== monthKey
-      ? highestWarning
-      : null;
+  // Re-evaluate the cat popup visibility whenever data finishes loading
+  // or the highest warning changes. The cooldown check reads both
+  // `Date.now()` and `localStorage` — both impure — so it must live in
+  // an effect per React Compiler's purity rules. The effect runs on
+  // mount too, so returning to /analytics after 24h re-triggers the
+  // popup naturally.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (loading || highestWarning === null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setWarningCatLevel(null);
+      return;
+    }
+    const ackedAtStr = window.localStorage.getItem(WARNING_ACK_STORAGE_KEY);
+    const ackedAt = ackedAtStr ? parseInt(ackedAtStr, 10) : NaN;
+    const inCooldown =
+      !isNaN(ackedAt) && Date.now() - ackedAt < WARNING_ACK_COOLDOWN_MS;
+    setWarningCatLevel(inCooldown ? null : highestWarning);
+  }, [loading, highestWarning]);
   const editingTxCategory = editingTx
     ? (SPENDING_CATEGORIES.find((c) => c.id === editingTx.categoryId) ?? null)
     : null;
@@ -532,11 +548,20 @@ export function AnalyticsClient({
         />
       )}
 
-      {/* Budget-warning cat popup — shown once per month per session
-          when any monthly budget is in warning/danger state. */}
+      {/* Budget-warning cat popup — shown when any monthly budget hits
+          warning/danger, unless the user tapped 知道了 within the last
+          24 hours (localStorage-backed cooldown). */}
       <BudgetWarningModal
         level={warningCatLevel}
-        onClose={() => setDismissedMonthKey(monthKey)}
+        onClose={() => {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(
+              WARNING_ACK_STORAGE_KEY,
+              String(Date.now())
+            );
+          }
+          setWarningCatLevel(null);
+        }}
       />
     </>
   );
