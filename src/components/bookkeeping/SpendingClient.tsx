@@ -55,6 +55,7 @@ export function SpendingClient() {
         ))}
       </div>
       <QuickEntryModal
+        key={selectedCategory?.id ?? "none"}
         category={selectedCategory}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
