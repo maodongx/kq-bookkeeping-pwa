@@ -1,6 +1,5 @@
 "use client";
 
-import { Card } from "@heroui/react";
 import {
   CATEGORY_ICONS,
   CATEGORY_ICON_FALLBACK,
@@ -14,7 +13,7 @@ interface CategoryIconProps {
 
 /**
  * Single tile in the spending-category grid. Tap opens the quick-entry
- * modal. `active:scale-95` gives tactile press feedback on iPhone.
+ * modal. Circular lavender icon with label below.
  */
 export function CategoryIcon({ category, onTap }: CategoryIconProps) {
   const IconComponent = CATEGORY_ICONS[category.icon] ?? CATEGORY_ICON_FALLBACK;
@@ -22,16 +21,14 @@ export function CategoryIcon({ category, onTap }: CategoryIconProps) {
     <button
       type="button"
       onClick={() => onTap(category)}
-      className="transition-transform active:scale-95"
+      className="flex flex-col items-center gap-2 transition-transform active:scale-95"
     >
-      <Card className="h-20">
-        <Card.Content className="flex flex-col items-center justify-center gap-1 p-2">
-          <IconComponent size={28} className="text-accent" />
-          <span className="w-full truncate text-center text-sm text-foreground">
-            {category.name}
-          </span>
-        </Card.Content>
-      </Card>
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#E6E0F8]">
+        <IconComponent size={26} className="text-[#7C3AED]" />
+      </div>
+      <span className="w-full truncate text-center text-xs text-foreground">
+        {category.name}
+      </span>
     </button>
   );
 }
