@@ -160,7 +160,12 @@ export function AnalyticsClient({
   const [viewMode, setViewMode] = useState<ViewMode>("monthly");
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [transactions, setTransactions] = useState<SpendingTransaction[]>([]);
+  // Year-wide source of truth. The monthly list is derived from this via
+  // a date-range filter, so edits and deletes only need to update one
+  // place and both views stay in sync.
+  const [yearTransactions, setYearTransactions] = useState<
+    SpendingTransaction[]
+  >([]);
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
   const [loading, setLoading] = useState(true);
   // Budget-editing state — which category is having its budget edited.
@@ -174,47 +179,44 @@ export function AnalyticsClient({
     year === now.getFullYear() && month === now.getMonth();
   const dayOfMonth = isCurrentMonth ? now.getDate() : daysInMonth;
 
-  // Year-to-date spending for ALL categories (not just annual-budget ones).
-  // Used both by annual view headers and by annual budget summaries.
-  const [annualSpending, setAnnualSpending] = useState<Map<string, number>>(
-    new Map()
+  // Monthly transactions derived from the year source. Cheap string
+  // comparison — DB dates are ISO YYYY-MM-DD and boundary strings are too.
+  const monthlyTransactions = yearTransactions.filter(
+    (tx) => tx.date >= startDate && tx.date <= endDate
   );
+
+  // Year-to-date spending map (display-currency-normalized) for all
+  // categories. Used by annual view headers and by annual budget
+  // percentage rendering in monthly view's expanded accordion.
+  const annualSpending = new Map<string, number>();
+  for (const tx of yearTransactions) {
+    const converted = convertCurrency(
+      tx.amount,
+      tx.currency,
+      displayCurrency,
+      rates
+    );
+    annualSpending.set(
+      tx.categoryId,
+      (annualSpending.get(tx.categoryId) ?? 0) + converted
+    );
+  }
 
   useEffect(() => {
     let cancelled = false;
-    const { startDate: sd, endDate: ed } = monthBoundariesLocal(year, month);
     const yearStart = `${year}-01-01`;
     const yearEnd = `${year}-12-31`;
 
     async function load() {
       setLoading(true);
       try {
-        const [txs, bgs, yearTxs] = await Promise.all([
-          getSpendingTransactions(sd, ed),
-          getCategoryBudgets(),
+        const [yearTxs, bgs] = await Promise.all([
           getSpendingTransactions(yearStart, yearEnd),
+          getCategoryBudgets(),
         ]);
         if (!cancelled) {
-          setTransactions(txs);
+          setYearTransactions(yearTxs);
           setBudgets(bgs);
-
-          // Annual spending map for ALL categories — annual view uses
-          // this directly; monthly view ignores it (monthly spending is
-          // derived from `txs` in computeSummaries).
-          const annualMap = new Map<string, number>();
-          for (const tx of yearTxs) {
-            const converted = convertCurrency(
-              tx.amount,
-              tx.currency,
-              displayCurrency,
-              rates
-            );
-            annualMap.set(
-              tx.categoryId,
-              (annualMap.get(tx.categoryId) ?? 0) + converted
-            );
-          }
-          setAnnualSpending(annualMap);
         }
       } catch (error) {
         console.error("Failed to fetch analytics data:", error);
@@ -227,7 +229,9 @@ export function AnalyticsClient({
     return () => {
       cancelled = true;
     };
-  }, [year, month, displayCurrency, rates]);
+    // Only year changes trigger a DB refetch — month changes within a year
+    // just re-filter the local array.
+  }, [year]);
 
   const goBack = () => {
     if (viewMode === "monthly") {
@@ -256,7 +260,7 @@ export function AnalyticsClient({
   };
 
   const summaries = computeSummaries({
-    monthlyTransactions: transactions,
+    monthlyTransactions,
     annualSpendingMap: annualSpending,
     budgets,
     displayCurrency,
@@ -305,8 +309,10 @@ export function AnalyticsClient({
         date: entry.date,
         notes: entry.notes,
       });
-      // Local in-place update — avoids a refetch + loading flash.
-      setTransactions((prev) =>
+      // Local in-place update — avoids a refetch + loading flash. Monthly
+      // view's list is derived from this array via a date-range filter,
+      // so both views stay in sync automatically.
+      setYearTransactions((prev) =>
         prev.map((t) => (t.id === saved.id ? saved : t))
       );
       toast.success("已保存");
@@ -321,7 +327,7 @@ export function AnalyticsClient({
     const id = editingTx.id;
     try {
       await deleteSpendingTransaction(id);
-      setTransactions((prev) => prev.filter((t) => t.id !== id));
+      setYearTransactions((prev) => prev.filter((t) => t.id !== id));
       toast.success("已删除");
     } catch (error) {
       const message = error instanceof Error ? error.message : "未知错误";
@@ -387,7 +393,7 @@ export function AnalyticsClient({
               would be a future addition. */}
           {viewMode === "monthly" && (
             <SpendingLineChart
-              transactions={transactions}
+              transactions={monthlyTransactions}
               startDate={startDate}
               endDate={endDate}
               displayCurrency={displayCurrency}
@@ -397,7 +403,9 @@ export function AnalyticsClient({
           {summaries.length > 0 ? (
             <CategoryBreakdown
               summaries={summaries}
-              transactions={transactions}
+              transactions={
+                viewMode === "monthly" ? monthlyTransactions : yearTransactions
+              }
               displayCurrency={displayCurrency}
               rates={rates}
               viewMode={viewMode}
