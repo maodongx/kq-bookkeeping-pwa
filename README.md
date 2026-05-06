@@ -17,8 +17,9 @@ This is a personal project, not a public product. The design goals are:
 - Transactions with five types: buy, sell, deposit, withdraw, adjustment
 - Live price fetching for US stocks (Yahoo), MUFG / Rakuten JP funds, CN funds (Tiantian)
 - Exchange rates auto-refreshed on dashboard load
-- Dashboard with net worth, 累计盈亏 / 近1月 / 年化 stats, allocation pie charts by tag and by risk level
-- Charts page: net worth line chart (1W / 1M / 3M / 6M / 1Y / ALL)
+- Dashboard with net worth, 累计盈亏 / 近1月 / 年化 stats, allocation pie charts by tag and by risk level, and a net-worth line chart (1W / 1M / 3M / 6M / 1Y / ALL)
+- Bookkeeping: 记账 page for daily entry across 17 spending categories; 明细 page listing spending by date with per-day quick-add; 分析 page with monthly & annual views, per-category drill-down, budget tracking, and a friendly cat popup when a monthly budget is in warning/danger
+- Monthly and annual budget types — monthly budgets reset each month; annual budgets (美容美妆, 远途旅行, 父母) carry Jan 1 to Dec 31
 - PWA with a purple cat icon and a hand-rolled service worker
 - Asian finance color convention throughout (red = gain, green = loss)
 
@@ -86,7 +87,9 @@ src/
 │   │   │   ├── add/page.tsx       # Client form, reuses AssetForm
 │   │   │   ├── [id]/page.tsx      # Asset detail + transaction history
 │   │   │   └── [id]/edit/page.tsx # Client form, reuses AssetForm
-│   │   └── charts/page.tsx        # Analysis page (server → ChartsClient)
+│   │   ├── spending/page.tsx      # 记账 — category grid entry
+│   │   ├── details/page.tsx       # 明细 — by-date spending list + quick add
+│   │   └── analytics/page.tsx     # 分析 — month/year view, budget drill-down
 │   ├── api/
 │   │   ├── prices/route.ts        # Proxies Yahoo / MUFG / Rakuten / Tiantian
 │   │   ├── exchange-rates/route.ts
@@ -95,8 +98,7 @@ src/
 │   ├── layout.tsx                 # Root layout, Toast.Provider, service worker
 │   └── globals.css                # Tailwind import + HeroUI finances theme tokens
 ├── components/
-│   ├── DashboardClient.tsx        # Interactive dashboard, currency switcher
-│   ├── ChartsClient.tsx           # Interactive charts, time range picker
+│   ├── DashboardClient.tsx        # Dashboard: currency switcher, pie charts, net-worth line chart
 │   ├── AssetForm.tsx              # Shared add/edit asset form (mode prop)
 │   ├── TransactionList.tsx        # Manages edit-mode state per row
 │   ├── TransactionRow.tsx         # Inline-editable single transaction
@@ -104,21 +106,33 @@ src/
 │   ├── UpdateBalanceForm.tsx      # For deposit/cash (not investments)
 │   ├── EditPriceButton.tsx        # Inline price edit on asset detail
 │   ├── RefreshPricesButton.tsx
-│   ├── BottomTabBar.tsx           # Lavender nav bar, 5 tabs (总览/资产/记账/分析/图表)
+│   ├── BottomTabBar.tsx           # Lavender nav bar, 5 tabs (总览/资产/记账/明细/分析)
 │   ├── CurrencySwitcher.tsx       # ToggleButtonGroup; persists user's default on change
-│   ├── NetWorthLineChart.tsx      # Recharts AreaChart
+│   ├── NetWorthLineChart.tsx      # Recharts AreaChart (embedded in dashboard)
 │   ├── AllocationPieChart.tsx     # Donut with Chip legend
 │   ├── StatCard.tsx               # Small label+value summary card
 │   ├── LabelValueRow.tsx          # Label ↔ value row inside a card
 │   ├── ConfirmDialog.tsx          # useConfirmDialog hook + AlertDialog
 │   ├── DeleteAssetButton.tsx
 │   ├── ServiceWorkerRegister.tsx
+│   ├── bookkeeping/               # 记账 / 明细 / 分析 feature
+│   │   ├── CategoryIcon.tsx       # Circular lavender tile in the 记账 grid
+│   │   ├── QuickEntryModal.tsx    # Create / edit a spending tx; optional picker mode
+│   │   ├── SpendingClient.tsx     # 记账 page: category grid + modal
+│   │   ├── DetailsClient.tsx      # 明细 page: group by date, per-day quick add
+│   │   ├── AnalyticsClient.tsx    # 分析 page: month/year toggle + drill-down
+│   │   ├── CategoryBreakdown.tsx  # Accordion of per-category budget + tx list
+│   │   ├── SpendingLineChart.tsx  # Per-day or per-month spending chart
+│   │   ├── BudgetSettingsModal.tsx
+│   │   └── BudgetWarningModal.tsx # Friendly cat popup for budget warnings
 │   └── ui/native-select.tsx       # The only remaining <select> wrapper
 ├── lib/
 │   ├── asset-calculations.ts      # computeHolding() — single source of truth
+│   ├── bookkeeping-data.ts        # SPENDING_CATEGORIES, CRUD, budget helpers
+│   ├── bookkeeping-types.ts       # Spending / budget / summary types
 │   ├── chart-utils.ts             # Net worth time series
 │   ├── currency.ts                # Formatters, labels, color helpers
-│   ├── date.ts                    # todayLocal / todayUTC / todayTokyoCompact
+│   ├── date.ts                    # todayLocal / todayUTC / daysAgoLocal / monthBoundariesLocal
 │   ├── exchange-rates.ts          # fetchLatestRates, convertCurrency
 │   ├── prices.ts                  # Client helper to refresh both APIs
 │   ├── supabase/
@@ -133,6 +147,8 @@ supabase/
 public/
 ├── manifest.json                  # PWA manifest
 ├── sw.js                          # Hand-written service worker
+├── warning_cat.png                # Budget-warning popup art
+├── danger_cat.png                 # Budget-danger popup art
 └── icons/                         # 192 / 512 / maskable / apple-touch
 ```
 
