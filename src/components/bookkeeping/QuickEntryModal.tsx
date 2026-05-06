@@ -79,7 +79,7 @@ const CURRENCIES: Currency[] = ["JPY", "USD", "CNY"];
  *   (edit mode only) [ 删除 ]          ← muted, centered
  */
 export function QuickEntryModal({
-  category: initialCategory,
+  category: categoryProp,
   isOpen,
   onClose,
   onSave,
@@ -87,12 +87,17 @@ export function QuickEntryModal({
   onDelete,
   showCategoryPicker = false,
 }: QuickEntryModalProps) {
-  // Internal category state for picker mode. Use initialCategory as the
-  // initial value; the key prop on the modal forces remount when it changes.
-  const [selectedCategory, setSelectedCategory] = useState<SpendingCategory | null>(
-    initialCategory
-  );
-  const category = selectedCategory;
+  // Two distinct modes of operation:
+  //   - Non-picker (default): `categoryProp` is the source of truth. Used
+  //     by /spending (icon tap fixes the category) and by edit flows
+  //     (editing an existing tx always has a known category).
+  //   - Picker: `categoryProp` is null on open; the user picks inline from
+  //     a grid. Used by /details when tapping the "+" on a date with no
+  //     pre-selected category.
+  // Keeping these separate avoids the props-to-state anti-pattern and the
+  // `key` remount hack that was previously layered on top of it.
+  const [pickerSelection, setPickerSelection] = useState<SpendingCategory | null>(null);
+  const category = showCategoryPicker ? pickerSelection : categoryProp;
 
   // useState's lazy initializer runs once per mount. Callers editing a
   // different transaction should use `key={tx.id}` on the modal so state
@@ -134,7 +139,7 @@ export function QuickEntryModal({
     setDate(todayLocal());
     setCurrency("JPY");
     setSuggestions([]);
-    if (showCategoryPicker) setSelectedCategory(null);
+    if (showCategoryPicker) setPickerSelection(null);
   };
 
   const handleConfirm = () => {
@@ -199,7 +204,7 @@ export function QuickEntryModal({
                       <button
                         key={cat.id}
                         type="button"
-                        onClick={() => setSelectedCategory(cat)}
+                        onClick={() => setPickerSelection(cat)}
                         className="flex flex-col items-center gap-1 transition-transform active:scale-95"
                       >
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E6E0F8]">
