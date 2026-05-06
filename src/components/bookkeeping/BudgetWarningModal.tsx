@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Button, Modal } from "@heroui/react";
 
 export type WarningModalLevel = "warning" | "danger";
@@ -14,8 +15,12 @@ interface BudgetWarningModalProps {
  * Friendly cat-art popup that greets the user on /analytics when at least
  * one monthly budget is in a warning/danger state. Intentionally mild
  * (emoji + Chinese copy + single dismiss button) — it's a family PWA,
- * not an alerting system. Dedup of "show once per month per session" is
- * done by the caller via sessionStorage.
+ * not an alerting system. Dedup of "show once per 24h after ack" is
+ * done by the caller via localStorage.
+ *
+ * Uses `next/image` so the 1536×1024 source PNGs (≈2.2MB each) get
+ * auto-optimized into WebP at device-appropriate sizes — important on
+ * a mobile PWA where these images are inline on every flagged visit.
  */
 export function BudgetWarningModal({ level, onClose }: BudgetWarningModalProps) {
   const isDanger = level === "danger";
@@ -41,11 +46,13 @@ export function BudgetWarningModal({ level, onClose }: BudgetWarningModalProps) 
           <Modal.Body>
             <div className="flex flex-col items-center gap-3">
               {level && (
-                // Public static image — loaded once per browser cache.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={imgSrc}
                   alt={heading}
+                  width={280}
+                  height={187}
+                  priority
+                  sizes="(max-width: 400px) 80vw, 280px"
                   className="w-full max-w-[280px] rounded-2xl"
                 />
               )}
