@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "@heroui/react";
 import { formatCurrency } from "@/lib/currency";
+import { convertCurrency, type RateMap } from "@/lib/exchange-rates";
 import {
   SPENDING_CATEGORIES,
   getSpendingTransactions,
@@ -12,6 +13,7 @@ import {
   deleteSpendingTransaction,
 } from "@/lib/bookkeeping-data";
 import type { SpendingTransaction, SpendingCategory } from "@/lib/bookkeeping-types";
+import type { Currency } from "@/lib/types";
 import { QuickEntryModal, SpendingEntry } from "./QuickEntryModal";
 
 const categoryMap = new Map(SPENDING_CATEGORIES.map((c) => [c.id, c]));
@@ -28,7 +30,14 @@ function groupByDate(txs: SpendingTransaction[]): Map<string, SpendingTransactio
   return new Map([...map.entries()].sort((a, b) => b[0].localeCompare(a[0])));
 }
 
-export function DetailsClient() {
+interface DetailsClientProps {
+  /** User's default currency — all displayed amounts are converted to this. */
+  displayCurrency: Currency;
+  /** Latest rate snapshot, keyed by (base, target). */
+  rates: RateMap;
+}
+
+export function DetailsClient({ displayCurrency, rates }: DetailsClientProps) {
   const [transactions, setTransactions] = useState<SpendingTransaction[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -154,6 +163,15 @@ export function DetailsClient() {
             <div className="space-y-2">
               {txs.map((tx) => {
                 const cat = categoryMap.get(tx.categoryId);
+                // Convert into the user's display currency. The edit
+                // modal still shows the native currency — conversion
+                // is display-only.
+                const converted = convertCurrency(
+                  tx.amount,
+                  tx.currency,
+                  displayCurrency,
+                  rates
+                );
                 return (
                   <button
                     key={tx.id}
@@ -168,7 +186,7 @@ export function DetailsClient() {
                       )}
                     </div>
                     <span className="shrink-0 tabular-nums">
-                      {formatCurrency(tx.amount, tx.currency)}
+                      {formatCurrency(converted, displayCurrency)}
                     </span>
                   </button>
                 );
