@@ -61,10 +61,10 @@ const CURRENCIES: Currency[] = ["JPY", "USD", "CNY"];
  *
  * Layout top-to-bottom:
  *
+ *                [JPY|USD|CNY]          ← currency switcher, centered
+ *   [金额____________________]          ← native number input (placeholder only)
  *   [备注（可选）______________]
  *   [chip] [chip] [chip] ...           ← top 5 notes for this category
- *                [JPY|USD|CNY]          ← centered
- *   价格     [0________________]        ← native number input
  *   [date]                     [确认]
  *   (edit mode only) [ 删除 ]          ← muted, centered
  */
@@ -168,6 +168,40 @@ export function QuickEntryModal({
           </Modal.Header>
           <Modal.Body>
             <div className="flex flex-col gap-4">
+              {/* Currency switcher, centered */}
+              <div className="flex justify-center">
+                <ToggleButtonGroup
+                  aria-label="货币"
+                  selectionMode="single"
+                  disallowEmptySelection
+                  selectedKeys={new Set<Key>([currency])}
+                  onSelectionChange={(keys) => {
+                    const next = [...keys][0];
+                    if (next) setCurrency(next as Currency);
+                  }}
+                >
+                  {CURRENCIES.map((c, i) => (
+                    <ToggleButton key={c} id={c}>
+                      {i > 0 && <ToggleButtonGroup.Separator />}
+                      {c}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </div>
+
+              {/* Amount — placeholder only, no external label */}
+              <Input
+                type="number"
+                inputMode="decimal"
+                step="any"
+                min={0}
+                placeholder="金额"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                variant="secondary"
+                className="input-flat"
+              />
+
               {/* Notes */}
               <Input
                 placeholder="备注（可选）"
@@ -195,43 +229,6 @@ export function QuickEntryModal({
                   ))}
                 </div>
               )}
-
-              {/* Currency switcher, centered */}
-              <div className="flex justify-center">
-                <ToggleButtonGroup
-                  aria-label="货币"
-                  selectionMode="single"
-                  disallowEmptySelection
-                  selectedKeys={new Set<Key>([currency])}
-                  onSelectionChange={(keys) => {
-                    const next = [...keys][0];
-                    if (next) setCurrency(next as Currency);
-                  }}
-                >
-                  {CURRENCIES.map((c, i) => (
-                    <ToggleButton key={c} id={c}>
-                      {i > 0 && <ToggleButtonGroup.Separator />}
-                      {c}
-                    </ToggleButton>
-                  ))}
-                </ToggleButtonGroup>
-              </div>
-
-              {/* Price row */}
-              <div className="flex items-center gap-3">
-                <span className="shrink-0 text-sm text-muted">价格</span>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  step="any"
-                  min={0}
-                  placeholder="0"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  variant="secondary"
-                  className="input-flat flex-1"
-                />
-              </div>
 
               {/* Date + Confirm */}
               <div className="flex items-center gap-2 pt-1">
