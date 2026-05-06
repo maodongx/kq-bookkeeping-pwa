@@ -65,6 +65,19 @@ export function monthBoundariesLocal(
   };
 }
 
+/**
+ * Date `n` days before today, as `YYYY-MM-DD` in the user's local
+ * timezone. Use for "last N days" range queries and for relative-date
+ * comparisons (e.g. "is this transaction from yesterday?"). Comparing
+ * against UTC-normalized dates when the stored dates are local is a
+ * subtle off-by-one around midnight that this helper avoids.
+ */
+export function daysAgoLocal(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return formatLocalDate(d);
+}
+
 /** Format a Date as `YYYY-MM-DD` using its local-time fields. */
 export function formatLocalDate(d: Date): string {
   const y = d.getFullYear();

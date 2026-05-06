@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { toast } from "@heroui/react";
 import { formatCurrency } from "@/lib/currency";
 import { convertCurrency, type RateMap } from "@/lib/exchange-rates";
+import { daysAgoLocal, todayLocal } from "@/lib/date";
 import {
   SPENDING_CATEGORIES,
   getSpendingTransactions,
@@ -47,13 +48,12 @@ export function DetailsClient({ displayCurrency, rates }: DetailsClientProps) {
   const [editingTx, setEditingTx] = useState<SpendingTransaction | null>(null);
   const [prefillDate, setPrefillDate] = useState<string | null>(null);
 
-  // Fetch last 90 days of transactions
+  // Fetch last 90 days of transactions. Bounds are in the user's local
+  // timezone to match how `tx.date` is stored (local YYYY-MM-DD),
+  // avoiding off-by-one at midnight UTC.
   useEffect(() => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - 90);
-    const startStr = start.toISOString().slice(0, 10);
-    const endStr = end.toISOString().slice(0, 10);
+    const startStr = daysAgoLocal(90);
+    const endStr = todayLocal();
 
     getSpendingTransactions(startStr, endStr)
       .then(setTransactions)
@@ -227,14 +227,13 @@ export function DetailsClient({ displayCurrency, rates }: DetailsClientProps) {
 }
 
 function formatDate(dateStr: string): string {
+  // Compare against local-date helpers — `tx.date` is stored local,
+  // so comparing against UTC-derived strings would mislabel near
+  // midnight (e.g. a real-yesterday tx reading as "今天").
+  if (dateStr === todayLocal()) return "今天";
+  if (dateStr === daysAgoLocal(1)) return "昨天";
+
   const d = new Date(dateStr + "T00:00:00");
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  if (dateStr === today.toISOString().slice(0, 10)) return "今天";
-  if (dateStr === yesterday.toISOString().slice(0, 10)) return "昨天";
-
   return d.toLocaleDateString("zh-CN", {
     month: "numeric",
     day: "numeric",
