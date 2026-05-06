@@ -24,6 +24,7 @@ import {
   updateSpendingTransaction,
 } from "@/lib/bookkeeping-data";
 import { monthBoundariesLocal } from "@/lib/date";
+import { formatCurrency } from "@/lib/currency";
 import { convertCurrency, type RateMap } from "@/lib/exchange-rates";
 import type { Currency } from "@/lib/types";
 import type {
@@ -41,6 +42,23 @@ import type {
  *     budgets get a "年度预算 X (剩余 Y%)" line in the expanded view.
  */
 export type ViewMode = "monthly" | "annual";
+
+/**
+ * Sum transaction amounts into the display currency. Each row is
+ * converted from its native currency before summing so the total is
+ * meaningful when the rows mix JPY / USD / CNY.
+ */
+function sumInDisplayCurrency(
+  transactions: SpendingTransaction[],
+  displayCurrency: Currency,
+  rates: RateMap
+): number {
+  let total = 0;
+  for (const tx of transactions) {
+    total += convertCurrency(tx.amount, tx.currency, displayCurrency, rates);
+  }
+  return total;
+}
 
 /**
  * Turn raw per-currency rows into per-category summaries normalized to
@@ -426,16 +444,42 @@ export function AnalyticsClient({
         </>
       ) : (
         <>
-          {/* Chart: daily spending only makes sense in monthly view. Annual
-              view skips it for now — a per-month bar chart over the year
-              would be a future addition. */}
-          {viewMode === "monthly" && (
+          {/* Line chart with subheader showing the period's total spend.
+              Monthly view: per-day, monthly total in subheader.
+              Annual view: per-month, annual total in subheader. */}
+          {viewMode === "monthly" ? (
             <SpendingLineChart
               transactions={monthlyTransactions}
               startDate={startDate}
               endDate={endDate}
               displayCurrency={displayCurrency}
               rates={rates}
+              granularity="day"
+              subheader={`${year}年${month + 1}月总支出 ${formatCurrency(
+                sumInDisplayCurrency(
+                  monthlyTransactions,
+                  displayCurrency,
+                  rates
+                ),
+                displayCurrency
+              )}`}
+            />
+          ) : (
+            <SpendingLineChart
+              transactions={yearTransactions}
+              startDate={`${year}-01-01`}
+              endDate={`${year}-12-31`}
+              displayCurrency={displayCurrency}
+              rates={rates}
+              granularity="month"
+              subheader={`${year}年总支出 ${formatCurrency(
+                sumInDisplayCurrency(
+                  yearTransactions,
+                  displayCurrency,
+                  rates
+                ),
+                displayCurrency
+              )}`}
             />
           )}
           {summaries.length > 0 ? (
