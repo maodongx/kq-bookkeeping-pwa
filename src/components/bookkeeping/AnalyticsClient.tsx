@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, toast } from "@heroui/react";
+import type { Key } from "@heroui/react";
+import {
+  Button,
+  ToggleButton,
+  ToggleButtonGroup,
+  toast,
+} from "@heroui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { SpendingLineChart } from "./SpendingLineChart";
 import { CategoryBreakdown } from "./CategoryBreakdown";
@@ -26,27 +32,46 @@ import type {
 } from "@/lib/bookkeeping-types";
 
 /**
- * Turn raw per-currency rows into per-category summaries normalized to
- * `displayCurrency`. Every `tx.amount` and `budget.budgetAmount` passes
- * through `convertCurrency` so the totals, percentUsed, and the
- * warning-level computation all compare like-to-like.
- *
- * For annual budgets, `annualSpendingMap` provides year-to-date totals
- * instead of monthly totals.
+ * The analytics page has two views:
+ *   - "monthly": pick a month; headers show that month's spending; monthly
+ *     budgets get a "月度预算 X (剩余 Y%)" line in the expanded view.
+ *   - "annual": pick a year; headers show the year's spending; annual
+ *     budgets get a "年度预算 X (剩余 Y%)" line in the expanded view.
  */
-function computeSummaries(
-  transactions: SpendingTransaction[],
-  budgets: CategoryBudget[],
-  displayCurrency: Currency,
-  rates: RateMap,
-  dayOfMonth: number,
-  daysInMonth: number,
-  annualSpendingMap: Map<string, number>
-): CategorySpendingSummary[] {
-  const budgetMap = new Map(budgets.map((b) => [b.categoryId, b]));
-  const monthlySpendingMap = new Map<string, number>();
+export type ViewMode = "monthly" | "annual";
 
-  for (const tx of transactions) {
+/**
+ * Turn raw per-currency rows into per-category summaries normalized to
+ * `displayCurrency`. The key difference from the previous implementation:
+ * every header amount is for the time bucket matching `viewMode`
+ * (monthly sum in monthly view, annual sum in annual view), NOT a
+ * per-category mix of monthly-vs-annual based on budget type. Budget
+ * references are only included when the budget's type matches the view.
+ */
+function computeSummaries({
+  monthlyTransactions,
+  annualSpendingMap,
+  budgets,
+  displayCurrency,
+  rates,
+  viewMode,
+  dayOfMonth,
+  daysInMonth,
+}: {
+  monthlyTransactions: SpendingTransaction[];
+  annualSpendingMap: Map<string, number>;
+  budgets: CategoryBudget[];
+  displayCurrency: Currency;
+  rates: RateMap;
+  viewMode: ViewMode;
+  dayOfMonth: number;
+  daysInMonth: number;
+}): CategorySpendingSummary[] {
+  const budgetMap = new Map(budgets.map((b) => [b.categoryId, b]));
+
+  // Monthly spending map from the selected month's transactions.
+  const monthlySpendingMap = new Map<string, number>();
+  for (const tx of monthlyTransactions) {
     const converted = convertCurrency(
       tx.amount,
       tx.currency,
@@ -59,25 +84,41 @@ function computeSummaries(
     );
   }
 
-  // Include categories with either spending OR a budget
+  // Pick the right spending map for the view.
+  const spendingMap =
+    viewMode === "monthly" ? monthlySpendingMap : annualSpendingMap;
+
+  // A category shows up if it has spending in the active time bucket OR
+  // has a budget of the active type (so "0 / 60000" bars still appear
+  // before the first entry of a period).
+  const relevantBudgetIds = new Set<string>(
+    Array.from(budgetMap.values())
+      .filter((b) =>
+        viewMode === "monthly"
+          ? b.budgetType === "monthly"
+          : b.budgetType === "annual"
+      )
+      .map((b) => b.categoryId)
+  );
   const relevantCategoryIds = new Set<string>([
-    ...monthlySpendingMap.keys(),
-    ...annualSpendingMap.keys(),
-    ...budgetMap.keys(),
+    ...spendingMap.keys(),
+    ...relevantBudgetIds,
   ]);
 
   return SPENDING_CATEGORIES.filter((cat) =>
     relevantCategoryIds.has(cat.id)
   ).map((cat) => {
+    const spent = spendingMap.get(cat.id) ?? 0;
     const budget = budgetMap.get(cat.id);
-    const isAnnual = budget?.budgetType === "annual";
 
-    // For annual budgets, use year-to-date spending; for monthly, use this month
-    const spent = isAnnual
-      ? (annualSpendingMap.get(cat.id) ?? 0)
-      : (monthlySpendingMap.get(cat.id) ?? 0);
+    // Only reference the budget if its type matches the current view — a
+    // monthly budget is meaningless in annual view and vice versa.
+    const budgetMatchesView =
+      budget != null &&
+      ((viewMode === "monthly" && budget.budgetType === "monthly") ||
+        (viewMode === "annual" && budget.budgetType === "annual"));
 
-    const budgetAmount = budget
+    const budgetAmount = budgetMatchesView
       ? convertCurrency(
           budget.budgetAmount,
           budget.currency,
@@ -87,9 +128,10 @@ function computeSummaries(
       : null;
     const percentUsed = budgetAmount ? (spent / budgetAmount) * 100 : null;
 
-    // For annual budgets, no pace-based warning — just show remaining
+    // Pace-based overspend warning only applies to monthly view — annual
+    // budgets span the whole year, so a linear projection isn't useful.
     const warningLevel =
-      budgetAmount && !isAnnual
+      budgetAmount && viewMode === "monthly"
         ? calculateBudgetWarning(spent, budgetAmount, dayOfMonth, daysInMonth)
         : "none";
 
@@ -100,7 +142,7 @@ function computeSummaries(
       percentUsed,
       projectedOverspend:
         warningLevel === "danger" || warningLevel === "warning",
-      budgetType: budget?.budgetType ?? null,
+      budgetType: budgetMatchesView ? (budget.budgetType ?? null) : null,
     };
   });
 }
@@ -115,12 +157,13 @@ export function AnalyticsClient({
   rates,
 }: AnalyticsClientProps) {
   const now = new Date();
+  const [viewMode, setViewMode] = useState<ViewMode>("monthly");
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [transactions, setTransactions] = useState<SpendingTransaction[]>([]);
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
   const [loading, setLoading] = useState(true);
-  // Budget-editing state — which category is having its monthly budget edited.
+  // Budget-editing state — which category is having its budget edited.
   const [editingBudgetCategory, setEditingBudgetCategory] =
     useState<SpendingCategory | null>(null);
   // Transaction-editing state — which existing tx is open in the modal.
@@ -131,7 +174,8 @@ export function AnalyticsClient({
     year === now.getFullYear() && month === now.getMonth();
   const dayOfMonth = isCurrentMonth ? now.getDate() : daysInMonth;
 
-  // Year-to-date spending for annual budget categories
+  // Year-to-date spending for ALL categories (not just annual-budget ones).
+  // Used both by annual view headers and by annual budget summaries.
   const [annualSpending, setAnnualSpending] = useState<Map<string, number>>(
     new Map()
   );
@@ -139,7 +183,6 @@ export function AnalyticsClient({
   useEffect(() => {
     let cancelled = false;
     const { startDate: sd, endDate: ed } = monthBoundariesLocal(year, month);
-    // Year boundaries for annual budgets
     const yearStart = `${year}-01-01`;
     const yearEnd = `${year}-12-31`;
 
@@ -155,24 +198,21 @@ export function AnalyticsClient({
           setTransactions(txs);
           setBudgets(bgs);
 
-          // Compute year-to-date totals for annual budget categories
-          const annualCategoryIds = new Set(
-            bgs.filter((b) => b.budgetType === "annual").map((b) => b.categoryId)
-          );
+          // Annual spending map for ALL categories — annual view uses
+          // this directly; monthly view ignores it (monthly spending is
+          // derived from `txs` in computeSummaries).
           const annualMap = new Map<string, number>();
           for (const tx of yearTxs) {
-            if (annualCategoryIds.has(tx.categoryId)) {
-              const converted = convertCurrency(
-                tx.amount,
-                tx.currency,
-                displayCurrency,
-                rates
-              );
-              annualMap.set(
-                tx.categoryId,
-                (annualMap.get(tx.categoryId) ?? 0) + converted
-              );
-            }
+            const converted = convertCurrency(
+              tx.amount,
+              tx.currency,
+              displayCurrency,
+              rates
+            );
+            annualMap.set(
+              tx.categoryId,
+              (annualMap.get(tx.categoryId) ?? 0) + converted
+            );
           }
           setAnnualSpending(annualMap);
         }
@@ -189,33 +229,42 @@ export function AnalyticsClient({
     };
   }, [year, month, displayCurrency, rates]);
 
-  const goToPrevMonth = () => {
-    if (month === 0) {
+  const goBack = () => {
+    if (viewMode === "monthly") {
+      if (month === 0) {
+        setYear(year - 1);
+        setMonth(11);
+      } else {
+        setMonth(month - 1);
+      }
+    } else {
       setYear(year - 1);
-      setMonth(11);
-    } else {
-      setMonth(month - 1);
     }
   };
 
-  const goToNextMonth = () => {
-    if (month === 11) {
+  const goForward = () => {
+    if (viewMode === "monthly") {
+      if (month === 11) {
+        setYear(year + 1);
+        setMonth(0);
+      } else {
+        setMonth(month + 1);
+      }
+    } else {
       setYear(year + 1);
-      setMonth(0);
-    } else {
-      setMonth(month + 1);
     }
   };
 
-  const summaries = computeSummaries(
-    transactions,
+  const summaries = computeSummaries({
+    monthlyTransactions: transactions,
+    annualSpendingMap: annualSpending,
     budgets,
     displayCurrency,
     rates,
+    viewMode,
     dayOfMonth,
     daysInMonth,
-    annualSpending
-  );
+  });
   const editingTxCategory = editingTx
     ? (SPENDING_CATEGORIES.find((c) => c.id === editingTx.categoryId) ?? null)
     : null;
@@ -282,25 +331,44 @@ export function AnalyticsClient({
 
   return (
     <>
+      {/* View mode toggle — centered */}
+      <div className="flex justify-center">
+        <ToggleButtonGroup
+          aria-label="视图"
+          selectionMode="single"
+          disallowEmptySelection
+          selectedKeys={new Set<Key>([viewMode])}
+          onSelectionChange={(keys) => {
+            const next = [...keys][0];
+            if (next) setViewMode(next as ViewMode);
+          }}
+        >
+          <ToggleButton id="monthly">月度</ToggleButton>
+          <ToggleButtonGroup.Separator />
+          <ToggleButton id="annual">年度</ToggleButton>
+        </ToggleButtonGroup>
+      </div>
+
+      {/* Period nav — shows month+year in monthly view, year only in annual */}
       <div className="flex items-center justify-between">
         <Button
           isIconOnly
           variant="ghost"
           size="sm"
-          onPress={goToPrevMonth}
-          aria-label="上一月"
+          onPress={goBack}
+          aria-label={viewMode === "monthly" ? "上一月" : "上一年"}
         >
           <ChevronLeft size={20} />
         </Button>
         <span className="text-lg font-semibold">
-          {year}年{month + 1}月
+          {viewMode === "monthly" ? `${year}年${month + 1}月` : `${year}年`}
         </span>
         <Button
           isIconOnly
           variant="ghost"
           size="sm"
-          onPress={goToNextMonth}
-          aria-label="下一月"
+          onPress={goForward}
+          aria-label={viewMode === "monthly" ? "下一月" : "下一年"}
         >
           <ChevronRight size={20} />
         </Button>
@@ -314,24 +382,32 @@ export function AnalyticsClient({
         </>
       ) : (
         <>
-          <SpendingLineChart
-            transactions={transactions}
-            startDate={startDate}
-            endDate={endDate}
-            displayCurrency={displayCurrency}
-            rates={rates}
-          />
+          {/* Chart: daily spending only makes sense in monthly view. Annual
+              view skips it for now — a per-month bar chart over the year
+              would be a future addition. */}
+          {viewMode === "monthly" && (
+            <SpendingLineChart
+              transactions={transactions}
+              startDate={startDate}
+              endDate={endDate}
+              displayCurrency={displayCurrency}
+              rates={rates}
+            />
+          )}
           {summaries.length > 0 ? (
             <CategoryBreakdown
               summaries={summaries}
               transactions={transactions}
               displayCurrency={displayCurrency}
               rates={rates}
+              viewMode={viewMode}
               onEditBudget={handleEditBudget}
               onEditTx={(tx) => setEditingTx(tx)}
             />
           ) : (
-            <p className="py-8 text-center text-muted">本月暂无支出记录</p>
+            <p className="py-8 text-center text-muted">
+              {viewMode === "monthly" ? "本月暂无支出记录" : "本年暂无支出记录"}
+            </p>
           )}
         </>
       )}

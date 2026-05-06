@@ -13,6 +13,7 @@ import type {
   CategorySpendingSummary,
   SpendingTransaction,
 } from "@/lib/bookkeeping-types";
+import type { ViewMode } from "./AnalyticsClient";
 
 interface CategoryBreakdownProps {
   summaries: CategorySpendingSummary[];
@@ -21,6 +22,8 @@ interface CategoryBreakdownProps {
   displayCurrency: Currency;
   /** Latest rate snapshot, keyed by (base, target). */
   rates: RateMap;
+  /** 月度 vs 年度 — drives the budget-line label in the expanded view. */
+  viewMode: ViewMode;
   /** Fires when the 修改预算 link is tapped for a category header. */
   onEditBudget: (categoryId: string) => void;
   /** Fires when an individual transaction row is tapped. */
@@ -28,10 +31,11 @@ interface CategoryBreakdownProps {
 }
 
 /**
- * Per-category accordion: header shows the rollup (total + remaining-
- * budget % + optional progress bar), expanding reveals every transaction
- * in that category sorted by date desc plus a "修改预算" link at the top.
- * Mirrors the drill-down pattern used on the assets tab.
+ * Per-category accordion. Header shows just the category name, icon,
+ * spending total, and an optional progress bar + overspend warning for
+ * monthly budgets. Expanding reveals the budget line (with inline
+ * remaining/over percentage) and every transaction in the period sorted
+ * date desc.
  *
  * All numeric values flow through `convertCurrency` into
  * `displayCurrency` before rendering — the source rows may be in JPY,
@@ -43,6 +47,7 @@ export function CategoryBreakdown({
   transactions,
   displayCurrency,
   rates,
+  viewMode,
   onEditBudget,
   onEditTx,
 }: CategoryBreakdownProps) {
@@ -59,21 +64,25 @@ export function CategoryBreakdown({
     arr.sort((a, b) => b.date.localeCompare(a.date));
   }
 
+  const budgetLabelPrefix = viewMode === "monthly" ? "月度预算" : "年度预算";
+  const emptyLabel =
+    viewMode === "monthly" ? "未设月度预算" : "未设年度预算";
+  const emptyTxMessage =
+    viewMode === "monthly" ? "本月暂无记录" : "本年暂无记录";
+
   return (
     <Accordion variant="surface">
       {sorted.map((summary) => {
         const IconComponent =
           CATEGORY_ICONS[summary.category.icon] ?? CATEGORY_ICON_FALLBACK;
         const txs = txByCategory.get(summary.category.id) ?? [];
-        // Budget-relative percentage: how much of the monthly allowance is
-        // left for this category. Null when no budget is set; positive
-        // "剩余 X%" when under, "超支 X%" when over.
-        const budgetLabel = budgetRelativeLabel(summary.percentUsed);
+        const budgetPctLabel = budgetRelativeLabel(summary.percentUsed);
         return (
           <Accordion.Item key={summary.category.id} id={summary.category.id}>
             <Accordion.Heading>
               <Accordion.Trigger>
                 <div className="flex w-full flex-col gap-2 pr-2">
+                  {/* Header row — name, total, and (monthly-only) overspend warning */}
                   <div className="flex items-center gap-3">
                     <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/10">
                       <IconComponent size={18} className="text-accent" />
@@ -88,19 +97,9 @@ export function CategoryBreakdown({
                       <span className="text-sm font-semibold tabular-nums">
                         {formatCurrency(summary.totalSpent, displayCurrency)}
                       </span>
-                      {budgetLabel && (
-                        <span
-                          className={`ml-1 text-xs font-normal ${
-                            budgetLabel.overBudget
-                              ? "text-warning"
-                              : "text-muted"
-                          }`}
-                        >
-                          ({budgetLabel.text})
-                        </span>
-                      )}
                     </div>
                   </div>
+                  {/* Progress bar — only when a budget of the active type exists. */}
                   {summary.budget !== null && summary.percentUsed !== null && (
                     <ProgressBar
                       size="sm"
@@ -117,12 +116,27 @@ export function CategoryBreakdown({
             </Accordion.Heading>
             <Accordion.Panel>
               <Accordion.Body className="p-0">
-                {/* Budget row + edit link — budget shown in display currency */}
+                {/* Budget row + edit link — includes inline remaining %. */}
                 <div className="flex items-center justify-between gap-3 border-b border-separator px-3 py-2 text-xs">
                   <span className="text-muted">
-                    {summary.budget !== null
-                      ? `${summary.budgetType === "annual" ? "年度预算" : "预算"} ${formatCurrency(summary.budget, displayCurrency)}`
-                      : "未设预算"}
+                    {summary.budget !== null ? (
+                      <>
+                        {`${budgetLabelPrefix} ${formatCurrency(summary.budget, displayCurrency)}`}
+                        {budgetPctLabel && (
+                          <span
+                            className={`ml-1 ${
+                              budgetPctLabel.overBudget
+                                ? "text-warning"
+                                : "text-muted"
+                            }`}
+                          >
+                            ({budgetPctLabel.text})
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      emptyLabel
+                    )}
                   </span>
                   <button
                     type="button"
@@ -137,7 +151,7 @@ export function CategoryBreakdown({
                     displayCurrency from the row's native currency. */}
                 {txs.length === 0 ? (
                   <p className="px-3 py-4 text-center text-xs text-muted">
-                    本月暂无记录
+                    {emptyTxMessage}
                   </p>
                 ) : (
                   <ul className="divide-y divide-separator">
@@ -183,7 +197,7 @@ export function CategoryBreakdown({
 
 /**
  * Given percentUsed (0-100 typically, can exceed 100 when over budget),
- * produce the label shown next to a category's total in the header.
+ * produce the label shown inline with the budget line.
  *   - Null percentUsed → null (no budget set, nothing to show)
  *   - 0-100 → "剩余 X%" (under budget: X = 100 - percentUsed)
  *   - >100  → "超支 X%" (over budget:  X = percentUsed - 100)
