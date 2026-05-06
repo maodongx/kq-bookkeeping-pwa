@@ -152,7 +152,7 @@ export function DetailsClient({ displayCurrency, rates }: DetailsClientProps) {
               <button
                 type="button"
                 onClick={() => handleAddOnDate(date)}
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-[#E6E0F8] text-[#7C3AED] transition-transform active:scale-95"
+                className="flex size-6 items-center justify-center rounded-full bg-[#E6E0F8] text-[#7C3AED] transition-transform active:scale-95"
                 aria-label={`添加 ${date} 的支出`}
               >
                 <Plus size={16} />

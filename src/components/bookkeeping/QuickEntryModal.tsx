@@ -207,7 +207,7 @@ export function QuickEntryModal({
                         onClick={() => setPickerSelection(cat)}
                         className="flex flex-col items-center gap-1 transition-transform active:scale-95"
                       >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E6E0F8]">
+                        <div className="flex size-10 items-center justify-center rounded-full bg-[#E6E0F8]">
                           <Icon size={18} className="text-[#7C3AED]" />
                         </div>
                         <span className="text-xs">{cat.name}</span>

@@ -23,7 +23,7 @@ export function CategoryIcon({ category, onTap }: CategoryIconProps) {
       onClick={() => onTap(category)}
       className="flex flex-col items-center gap-2 transition-transform active:scale-95"
     >
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#E6E0F8]">
+      <div className="flex size-14 items-center justify-center rounded-full bg-[#E6E0F8]">
         <IconComponent size={26} className="text-[#7C3AED]" />
       </div>
       <span className="w-full truncate text-center text-xs text-foreground">
