@@ -6,6 +6,7 @@ import { hasPerAssetGainLoss } from "@/lib/currency";
 import { computeHolding } from "@/lib/asset-calculations";
 import { convertCurrency, fetchLatestRates } from "@/lib/exchange-rates";
 import { AssetsClient, CategoryGroup } from "@/components/AssetsClient";
+import { DownloadAssetsButton } from "@/components/DownloadAssetsButton";
 
 /**
  * Show categories in a predictable order regardless of how assets were
@@ -32,9 +33,12 @@ export default function AssetsPage() {
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">资产</h1>
-        <Link href="/assets/add" className="button button--primary button--md">
-          + 添加
-        </Link>
+        <div className="flex items-center gap-2">
+          <DownloadAssetsButton />
+          <Link href="/assets/add" className="button button--primary button--md">
+            + 添加
+          </Link>
+        </div>
       </div>
       <Suspense fallback={<AssetsBodySkeleton />}>
         <AssetsBody />
