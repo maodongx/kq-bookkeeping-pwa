@@ -285,8 +285,18 @@ export async function getTopNotesForCategory(
 }
 
 /**
+ * Categories that should skip pace-based warning prediction. Used for
+ * fixed costs the user pre-enters at the start of the month (e.g. rent
+ * paid on the 1st). Without this exclusion, those categories always
+ * look like dangerous overspending by projection.
+ */
+export const PREDICTION_EXCLUDED_CATEGORY_IDS = new Set<string>(["rent"]);
+
+/**
  * Classify budget health by projecting current pace to month end.
- *  - `danger`  — already over, OR projected to exceed 100%.
+ *  - `danger`  — strictly over budget, OR projected to *exceed* 100%.
+ *    Exactly 100% is NOT danger (it means you spent exactly what you
+ *    budgeted — that's on-target, not a warning).
  *  - `warning` — projected to hit 80%-100%.
  *  - `caution` — projected to hit 60%-80%.
  *  - `none`    — on track or no budget set.
@@ -298,14 +308,14 @@ export function calculateBudgetWarning(
   daysInMonth: number
 ): BudgetWarningLevel {
   if (budget <= 0) return "none";
-  if (spent >= budget) return "danger";
+  if (spent > budget) return "danger";
 
   const percentMonthElapsed = dayOfMonth / daysInMonth;
   const projectedSpend =
     percentMonthElapsed > 0 ? spent / percentMonthElapsed : spent;
   const projectedPercent = projectedSpend / budget;
 
-  if (projectedPercent >= 1) return "danger";
+  if (projectedPercent > 1) return "danger";
   if (projectedPercent >= 0.8) return "warning";
   if (projectedPercent >= 0.6) return "caution";
   return "none";

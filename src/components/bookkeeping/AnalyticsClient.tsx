@@ -20,6 +20,7 @@ import {
   deleteSpendingTransaction,
   getCategoryBudgets,
   getSpendingTransactions,
+  PREDICTION_EXCLUDED_CATEGORY_IDS,
   updateSpendingTransaction,
 } from "@/lib/bookkeeping-data";
 import { monthBoundariesLocal } from "@/lib/date";
@@ -131,8 +132,12 @@ function computeSummaries({
 
     // Pace-based overspend warning only applies to monthly view — annual
     // budgets span the whole year, so a linear projection isn't useful.
+    // Also skip categories that are pre-entered fixed costs (e.g. 房租
+    // paid in full on day 1 always reads as "danger" by projection).
     const warningLevel =
-      budgetAmount && viewMode === "monthly"
+      budgetAmount &&
+      viewMode === "monthly" &&
+      !PREDICTION_EXCLUDED_CATEGORY_IDS.has(cat.id)
         ? calculateBudgetWarning(spent, budgetAmount, dayOfMonth, daysInMonth)
         : "none";
 
@@ -294,38 +299,14 @@ export function AnalyticsClient({
   }
 
   // Derive modal visibility from: (a) a warning exists, (b) data loaded,
-  // (c) user hasn't dismissed this month, (d) sessionStorage doesn't have
-  // it marked as already shown. Reading sessionStorage during render is
-  // fine for `"use client"` components after hydration; initial SSR pass
-  // sees `false` and the component is invisible anyway.
+  // (c) user hasn't dismissed this month during the current mount. No
+  // sessionStorage persistence — the popup is a nudge, and the user
+  // wants to see it every time they open the page.
   const monthKey = `${year}-${month}`;
-  const alreadyShownThisSession =
-    typeof window !== "undefined" &&
-    !!window.sessionStorage.getItem(
-      `kq:analytics-warning-shown:${monthKey}`
-    );
   const warningCatLevel: WarningModalLevel | null =
-    !loading &&
-    highestWarning !== null &&
-    dismissedMonthKey !== monthKey &&
-    !alreadyShownThisSession
+    !loading && highestWarning !== null && dismissedMonthKey !== monthKey
       ? highestWarning
       : null;
-
-  // Persist to sessionStorage once the modal is actually being rendered,
-  // so refreshing or coming back later in the session doesn't re-show it.
-  // Wrapped in a simple guard to avoid the "setState in effect" rule — we
-  // only WRITE to sessionStorage, don't call setState here.
-  if (
-    warningCatLevel !== null &&
-    typeof window !== "undefined" &&
-    !alreadyShownThisSession
-  ) {
-    window.sessionStorage.setItem(
-      `kq:analytics-warning-shown:${monthKey}`,
-      warningCatLevel
-    );
-  }
   const editingTxCategory = editingTx
     ? (SPENDING_CATEGORIES.find((c) => c.id === editingTx.categoryId) ?? null)
     : null;
