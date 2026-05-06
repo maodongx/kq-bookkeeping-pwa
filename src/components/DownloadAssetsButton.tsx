@@ -4,18 +4,25 @@ import { useState } from "react";
 import { Download } from "lucide-react";
 import { Button, toast } from "@heroui/react";
 import { createClient } from "@/lib/supabase/client";
+import { computeHolding } from "@/lib/asset-calculations";
+import { convertCurrency, fetchLatestRates } from "@/lib/exchange-rates";
 import { todayLocal } from "@/lib/date";
+import type { Asset, Transaction } from "@/lib/types";
 
 /**
- * "下载" button on the assets page — dumps the full bookkeeping dataset
- * as a JSON file for external AI analysis. Pulls fresh rows from
- * Supabase rather than reusing the server-rendered view so the download
- * always reflects the live DB state at click time.
+ * "下载" button on the assets page — exports one flat row per asset,
+ * intended as input for external AI analysis. The shape is deliberately
+ * slim (no per-transaction noise):
  *
- * The payload intentionally ships raw DB rows (no display-currency
- * conversion) so downstream tooling can apply its own normalization.
- * Exchange rates and price snapshots are included so conversions can
- * be reproduced offline.
+ *   {
+ *     name, code, category, tag, riskLevel,
+ *     totalShares,  // units held, from computeHolding().totalQty
+ *     totalValueUSD // market value converted to USD at the latest rate
+ *   }
+ *
+ * USD is a fixed pivot currency here — independent of whatever the user
+ * has set as their dashboard display currency — so the output is stable
+ * across sessions for downstream analysis.
  */
 export function DownloadAssetsButton() {
   const [busy, setBusy] = useState(false);
@@ -27,25 +34,42 @@ export function DownloadAssetsButton() {
       const [
         { data: assets, error: ea },
         { data: transactions, error: et },
-        { data: priceSnapshots, error: ep },
-        { data: rateSnapshots, error: er },
+        rates,
       ] = await Promise.all([
         supabase.from("assets").select("*"),
         supabase.from("transactions").select("*"),
-        supabase.from("asset_price_snapshots").select("*"),
-        supabase.from("exchange_rate_snapshots").select("*"),
+        fetchLatestRates(supabase),
       ]);
 
-      const firstError = ea ?? et ?? ep ?? er;
+      const firstError = ea ?? et;
       if (firstError) throw firstError;
+
+      const assetList = (assets ?? []) as Asset[];
+      const txList = (transactions ?? []) as Transaction[];
+
+      const rows = assetList.map((asset) => {
+        const { totalQty, marketValue } = computeHolding(asset, txList);
+        return {
+          name: asset.name,
+          code: asset.symbol, // "code" is the user-facing term; DB column is `symbol`
+          category: asset.category,
+          tag: asset.tag,
+          riskLevel: asset.risk_level,
+          totalShares: totalQty,
+          totalValueUSD: convertCurrency(
+            marketValue,
+            asset.currency,
+            "USD",
+            rates
+          ),
+        };
+      });
 
       const payload = {
         exportedAt: new Date().toISOString(),
-        schemaVersion: 1,
-        assets: assets ?? [],
-        transactions: transactions ?? [],
-        assetPriceSnapshots: priceSnapshots ?? [],
-        exchangeRateSnapshots: rateSnapshots ?? [],
+        currency: "USD",
+        schemaVersion: 2,
+        assets: rows,
       };
 
       const blob = new Blob([JSON.stringify(payload, null, 2)], {
