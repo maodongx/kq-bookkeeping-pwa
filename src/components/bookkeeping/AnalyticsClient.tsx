@@ -12,6 +12,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { SpendingLineChart } from "./SpendingLineChart";
 import { CategoryBreakdown } from "./CategoryBreakdown";
 import { BudgetSettingsModal } from "./BudgetSettingsModal";
+import { BudgetWarningModal, type WarningModalLevel } from "./BudgetWarningModal";
 import { QuickEntryModal } from "./QuickEntryModal";
 import {
   SPENDING_CATEGORIES,
@@ -143,6 +144,7 @@ function computeSummaries({
       projectedOverspend:
         warningLevel === "danger" || warningLevel === "warning",
       budgetType: budgetMatchesView ? (budget.budgetType ?? null) : null,
+      warningLevel,
     };
   });
 }
@@ -173,6 +175,13 @@ export function AnalyticsClient({
     useState<SpendingCategory | null>(null);
   // Transaction-editing state — which existing tx is open in the modal.
   const [editingTx, setEditingTx] = useState<SpendingTransaction | null>(null);
+  // Budget-warning cat popup: track user dismissals by month key and
+  // persist across page navigation within the session via sessionStorage.
+  // Derived visibility (below) rather than stored, so we don't violate
+  // the "no setState in effect" rule.
+  const [dismissedMonthKey, setDismissedMonthKey] = useState<string | null>(
+    null
+  );
 
   const { startDate, endDate, daysInMonth } = monthBoundariesLocal(year, month);
   const isCurrentMonth =
@@ -269,6 +278,54 @@ export function AnalyticsClient({
     dayOfMonth,
     daysInMonth,
   });
+
+  // Highest pace-based warning across all monthly budgets. Danger trumps
+  // warning; caution and none don't trigger the cat popup. Only computed
+  // in monthly view — annual budgets don't have pace warnings.
+  let highestWarning: WarningModalLevel | null = null;
+  if (viewMode === "monthly") {
+    for (const s of summaries) {
+      if (s.warningLevel === "danger") {
+        highestWarning = "danger";
+        break;
+      }
+      if (s.warningLevel === "warning") highestWarning = "warning";
+    }
+  }
+
+  // Derive modal visibility from: (a) a warning exists, (b) data loaded,
+  // (c) user hasn't dismissed this month, (d) sessionStorage doesn't have
+  // it marked as already shown. Reading sessionStorage during render is
+  // fine for `"use client"` components after hydration; initial SSR pass
+  // sees `false` and the component is invisible anyway.
+  const monthKey = `${year}-${month}`;
+  const alreadyShownThisSession =
+    typeof window !== "undefined" &&
+    !!window.sessionStorage.getItem(
+      `kq:analytics-warning-shown:${monthKey}`
+    );
+  const warningCatLevel: WarningModalLevel | null =
+    !loading &&
+    highestWarning !== null &&
+    dismissedMonthKey !== monthKey &&
+    !alreadyShownThisSession
+      ? highestWarning
+      : null;
+
+  // Persist to sessionStorage once the modal is actually being rendered,
+  // so refreshing or coming back later in the session doesn't re-show it.
+  // Wrapped in a simple guard to avoid the "setState in effect" rule — we
+  // only WRITE to sessionStorage, don't call setState here.
+  if (
+    warningCatLevel !== null &&
+    typeof window !== "undefined" &&
+    !alreadyShownThisSession
+  ) {
+    window.sessionStorage.setItem(
+      `kq:analytics-warning-shown:${monthKey}`,
+      warningCatLevel
+    );
+  }
   const editingTxCategory = editingTx
     ? (SPENDING_CATEGORIES.find((c) => c.id === editingTx.categoryId) ?? null)
     : null;
@@ -449,6 +506,13 @@ export function AnalyticsClient({
           onDelete={handleDeleteTx}
         />
       )}
+
+      {/* Budget-warning cat popup — shown once per month per session
+          when any monthly budget is in warning/danger state. */}
+      <BudgetWarningModal
+        level={warningCatLevel}
+        onClose={() => setDismissedMonthKey(monthKey)}
+      />
     </>
   );
 }

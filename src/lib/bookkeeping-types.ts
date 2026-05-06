@@ -38,6 +38,15 @@ export interface CategoryBudget {
   budgetType: "monthly" | "annual";
 }
 
+/**
+ * Budget health classification driven by pace-based projection.
+ *   - `danger`  — already over, or projected to exceed 100%.
+ *   - `warning` — projected to hit 80%-100%.
+ *   - `caution` — projected to hit 60%-80%.
+ *   - `none`    — on track or no budget set.
+ */
+export type BudgetWarningLevel = "none" | "caution" | "warning" | "danger";
+
 /** Computed summary for analytics display. */
 export interface CategorySpendingSummary {
   category: SpendingCategory;
@@ -49,4 +58,6 @@ export interface CategorySpendingSummary {
   projectedOverspend: boolean;
   /** 'monthly' or 'annual' — affects how the budget label is displayed. */
   budgetType: "monthly" | "annual" | null;
+  /** Pace-based warning level. Always 'none' in annual view. */
+  warningLevel: BudgetWarningLevel;
 }

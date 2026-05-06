@@ -24,6 +24,7 @@ import type {
   SpendingCategory,
   SpendingTransaction,
   CategoryBudget,
+  BudgetWarningLevel,
 } from "@/lib/bookkeeping-types";
 
 /**
@@ -231,7 +232,7 @@ export async function upsertCategoryBudget(
 }
 
 /** Warning levels for budget status, driven by pace-based projection. */
-export type BudgetWarningLevel = "none" | "caution" | "warning" | "danger";
+export type { BudgetWarningLevel } from "@/lib/bookkeeping-types";
 
 /**
  * Return up to `limit` most-used note keywords for a category. "Most used"
