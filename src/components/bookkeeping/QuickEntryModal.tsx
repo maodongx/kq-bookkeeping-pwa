@@ -11,7 +11,12 @@ import {
   ToggleButtonGroup,
 } from "@heroui/react";
 import { todayLocal } from "@/lib/date";
-import { getTopNotesForCategory } from "@/lib/bookkeeping-data";
+import {
+  getTopNotesForCategory,
+  SPENDING_CATEGORIES,
+  CATEGORY_ICONS,
+  CATEGORY_ICON_FALLBACK,
+} from "@/lib/bookkeeping-data";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import type { Currency } from "@/lib/types";
 import type { SpendingCategory } from "@/lib/bookkeeping-types";
@@ -50,6 +55,11 @@ interface QuickEntryModalProps {
    * actual delete.
    */
   onDelete?: () => void | Promise<void>;
+  /**
+   * When true, shows a category picker grid before the entry form.
+   * Used when adding from /details where no category is pre-selected.
+   */
+  showCategoryPicker?: boolean;
 }
 
 const CURRENCIES: Currency[] = ["JPY", "USD", "CNY"];
@@ -69,15 +79,24 @@ const CURRENCIES: Currency[] = ["JPY", "USD", "CNY"];
  *   (edit mode only) [ 删除 ]          ← muted, centered
  */
 export function QuickEntryModal({
-  category,
+  category: initialCategory,
   isOpen,
   onClose,
   onSave,
   initialValues = null,
   onDelete,
+  showCategoryPicker = false,
 }: QuickEntryModalProps) {
+  // Internal category state for picker mode. Use initialCategory as the
+  // initial value; the key prop on the modal forces remount when it changes.
+  const [selectedCategory, setSelectedCategory] = useState<SpendingCategory | null>(
+    initialCategory
+  );
+  const category = selectedCategory;
+
   // useState's lazy initializer runs once per mount. Callers editing a
-  // different transaction should use `key={tx.id}` to force a fresh mount.
+  // different transaction should use `key={tx.id}` on the modal so state
+  // re-inits when the transaction being edited changes.
   const [amount, setAmount] = useState(() =>
     initialValues ? String(initialValues.amount) : ""
   );
@@ -115,6 +134,7 @@ export function QuickEntryModal({
     setDate(todayLocal());
     setCurrency("JPY");
     setSuggestions([]);
+    if (showCategoryPicker) setSelectedCategory(null);
   };
 
   const handleConfirm = () => {
@@ -164,10 +184,37 @@ export function QuickEntryModal({
         <Modal.Dialog className="sm:max-w-[400px]">
           <Modal.CloseTrigger />
           <Modal.Header>
-            <Modal.Heading>{category?.name}</Modal.Heading>
+            <Modal.Heading>
+              {showCategoryPicker && !category ? "选择分类" : category?.name}
+            </Modal.Heading>
           </Modal.Header>
           <Modal.Body>
             <div className="flex flex-col gap-4">
+              {/* Category picker grid — only when showCategoryPicker and no category selected */}
+              {showCategoryPicker && !category && (
+                <div className="grid grid-cols-4 gap-3">
+                  {SPENDING_CATEGORIES.map((cat) => {
+                    const Icon = CATEGORY_ICONS[cat.icon] ?? CATEGORY_ICON_FALLBACK;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat)}
+                        className="flex flex-col items-center gap-1 transition-transform active:scale-95"
+                      >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E6E0F8]">
+                          <Icon size={18} className="text-[#7C3AED]" />
+                        </div>
+                        <span className="text-xs">{cat.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Entry form — only when category is selected */}
+              {category && (
+                <>
               {/* Currency switcher, centered */}
               <div className="flex justify-center">
                 <ToggleButtonGroup
@@ -260,6 +307,8 @@ export function QuickEntryModal({
                     删除
                   </Button>
                 </div>
+              )}
+              </>
               )}
             </div>
             <ConfirmDeleteDialog />

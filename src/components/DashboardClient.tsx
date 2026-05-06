@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Key } from "@heroui/react";
 import {
   Asset,
   AssetPriceSnapshot,
@@ -17,10 +18,18 @@ import {
   DashboardAsset,
   computeDashboardStats,
 } from "@/lib/dashboard-stats";
-import { Card } from "@heroui/react";
+import {
+  TimeRange,
+  TIME_RANGE_LABELS,
+  computeNetWorthTimeSeries,
+} from "@/lib/chart-utils";
+import { Card, ToggleButton, ToggleButtonGroup } from "@heroui/react";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { AllocationPieChart } from "./AllocationPieChart";
 import { StatCard } from "./StatCard";
+import { NetWorthLineChart } from "./NetWorthLineChart";
+
+const TIME_RANGES: TimeRange[] = ["1W", "1M", "3M", "6M", "1Y", "ALL"];
 
 /** "+3.21%", "-1.05%", or "—" when the percentage is not available. */
 function fmtPct(pct: number | null): string {
@@ -60,6 +69,7 @@ export function DashboardClient({
   lastUpdate: string | null;
 }) {
   const [currency, setCurrency] = useState<Currency>(defaultCurrency);
+  const [range, setRange] = useState<TimeRange>("3M");
   const router = useRouter();
 
   useEffect(() => {
@@ -101,6 +111,19 @@ export function DashboardClient({
         currency,
       }),
     [assets, rawAssets, transactions, priceSnapshots, rateSnapshots, rates, currency]
+  );
+
+  const timeSeries = useMemo(
+    () =>
+      computeNetWorthTimeSeries(
+        rawAssets,
+        transactions,
+        priceSnapshots,
+        rateSnapshots,
+        currency,
+        range
+      ),
+    [rawAssets, transactions, priceSnapshots, rateSnapshots, currency, range]
   );
 
   const hasAssets = assets.length > 0;
@@ -174,6 +197,32 @@ export function DashboardClient({
         currency={currency}
         centerLabel="总计"
       />
+
+      {/* Net worth line chart */}
+      {hasAssets && (
+        <>
+          <div className="flex justify-center">
+            <ToggleButtonGroup
+              aria-label="时间范围"
+              selectionMode="single"
+              disallowEmptySelection
+              selectedKeys={new Set<Key>([range])}
+              onSelectionChange={(keys) => {
+                const next = [...keys][0];
+                if (next) setRange(next as TimeRange);
+              }}
+            >
+              {TIME_RANGES.map((r, i) => (
+                <ToggleButton key={r} id={r}>
+                  {i > 0 && <ToggleButtonGroup.Separator />}
+                  {TIME_RANGE_LABELS[r]}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </div>
+          <NetWorthLineChart data={timeSeries} currency={currency} />
+        </>
+      )}
     </>
   );
 }
