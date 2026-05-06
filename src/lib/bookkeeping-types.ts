@@ -28,12 +28,14 @@ export interface SpendingTransaction {
   createdAt: string;
 }
 
-/** Monthly budget for a category. One per category, shared across the household. */
+/** Budget for a category. One per category, shared across the household. */
 export interface CategoryBudget {
   id: string;
   categoryId: string;
-  monthlyBudget: number;
+  budgetAmount: number;
   currency: Currency;
+  /** 'monthly' resets each month; 'annual' carries over Jan 1 - Dec 31. */
+  budgetType: "monthly" | "annual";
 }
 
 /** Computed summary for analytics display. */
@@ -45,4 +47,6 @@ export interface CategorySpendingSummary {
   percentUsed: number | null;
   /** True when projected month-end spend will exceed the budget at current pace. */
   projectedOverspend: boolean;
+  /** 'monthly' or 'annual' — affects how the budget label is displayed. */
+  budgetType: "monthly" | "annual" | null;
 }

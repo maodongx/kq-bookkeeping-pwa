@@ -194,8 +194,9 @@ export async function getCategoryBudgets(): Promise<CategoryBudget[]> {
   return (data ?? []).map((row) => ({
     id: row.id,
     categoryId: row.category_id,
-    monthlyBudget: row.monthly_budget,
+    budgetAmount: row.budget_amount,
     currency: row.currency,
+    budgetType: row.budget_type ?? "monthly",
   }));
 }
 
@@ -209,8 +210,9 @@ export async function upsertCategoryBudget(
     .upsert(
       {
         category_id: budget.categoryId,
-        monthly_budget: budget.monthlyBudget,
+        budget_amount: budget.budgetAmount,
         currency: budget.currency,
+        budget_type: budget.budgetType,
       },
       { onConflict: "category_id" }
     )
@@ -222,8 +224,9 @@ export async function upsertCategoryBudget(
   return {
     id: data.id,
     categoryId: data.category_id,
-    monthlyBudget: data.monthly_budget,
+    budgetAmount: data.budget_amount,
     currency: data.currency,
+    budgetType: data.budget_type ?? "monthly",
   };
 }
 

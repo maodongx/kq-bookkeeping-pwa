@@ -27,11 +27,12 @@ import type {
 
 /**
  * Turn raw per-currency rows into per-category summaries normalized to
- * `displayCurrency`. Every `tx.amount` and `budget.monthlyBudget` passes
+ * `displayCurrency`. Every `tx.amount` and `budget.budgetAmount` passes
  * through `convertCurrency` so the totals, percentUsed, and the
- * warning-level computation all compare like-to-like. Without this, a
- * JPY budget and a CNY transaction would be summed raw and produce
- * nonsense numbers.
+ * warning-level computation all compare like-to-like.
+ *
+ * For annual budgets, `annualSpendingMap` provides year-to-date totals
+ * instead of monthly totals.
  */
 function computeSummaries(
   transactions: SpendingTransaction[],
@@ -39,10 +40,11 @@ function computeSummaries(
   displayCurrency: Currency,
   rates: RateMap,
   dayOfMonth: number,
-  daysInMonth: number
+  daysInMonth: number,
+  annualSpendingMap: Map<string, number>
 ): CategorySpendingSummary[] {
   const budgetMap = new Map(budgets.map((b) => [b.categoryId, b]));
-  const spendingMap = new Map<string, number>();
+  const monthlySpendingMap = new Map<string, number>();
 
   for (const tx of transactions) {
     const converted = convertCurrency(
@@ -51,37 +53,45 @@ function computeSummaries(
       displayCurrency,
       rates
     );
-    spendingMap.set(
+    monthlySpendingMap.set(
       tx.categoryId,
-      (spendingMap.get(tx.categoryId) ?? 0) + converted
+      (monthlySpendingMap.get(tx.categoryId) ?? 0) + converted
     );
   }
 
-  // Include categories with either spending OR a budget so the user can
-  // see "0 / 60,000" progress bars even before the first entry of a
-  // month.
+  // Include categories with either spending OR a budget
   const relevantCategoryIds = new Set<string>([
-    ...spendingMap.keys(),
+    ...monthlySpendingMap.keys(),
+    ...annualSpendingMap.keys(),
     ...budgetMap.keys(),
   ]);
 
   return SPENDING_CATEGORIES.filter((cat) =>
     relevantCategoryIds.has(cat.id)
   ).map((cat) => {
-    const spent = spendingMap.get(cat.id) ?? 0;
     const budget = budgetMap.get(cat.id);
+    const isAnnual = budget?.budgetType === "annual";
+
+    // For annual budgets, use year-to-date spending; for monthly, use this month
+    const spent = isAnnual
+      ? (annualSpendingMap.get(cat.id) ?? 0)
+      : (monthlySpendingMap.get(cat.id) ?? 0);
+
     const budgetAmount = budget
       ? convertCurrency(
-          budget.monthlyBudget,
+          budget.budgetAmount,
           budget.currency,
           displayCurrency,
           rates
         )
       : null;
     const percentUsed = budgetAmount ? (spent / budgetAmount) * 100 : null;
-    const warningLevel = budgetAmount
-      ? calculateBudgetWarning(spent, budgetAmount, dayOfMonth, daysInMonth)
-      : "none";
+
+    // For annual budgets, no pace-based warning — just show remaining
+    const warningLevel =
+      budgetAmount && !isAnnual
+        ? calculateBudgetWarning(spent, budgetAmount, dayOfMonth, daysInMonth)
+        : "none";
 
     return {
       category: cat,
@@ -90,6 +100,7 @@ function computeSummaries(
       percentUsed,
       projectedOverspend:
         warningLevel === "danger" || warningLevel === "warning",
+      budgetType: budget?.budgetType ?? null,
     };
   });
 }
@@ -120,20 +131,50 @@ export function AnalyticsClient({
     year === now.getFullYear() && month === now.getMonth();
   const dayOfMonth = isCurrentMonth ? now.getDate() : daysInMonth;
 
+  // Year-to-date spending for annual budget categories
+  const [annualSpending, setAnnualSpending] = useState<Map<string, number>>(
+    new Map()
+  );
+
   useEffect(() => {
     let cancelled = false;
     const { startDate: sd, endDate: ed } = monthBoundariesLocal(year, month);
+    // Year boundaries for annual budgets
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
 
     async function load() {
       setLoading(true);
       try {
-        const [txs, bgs] = await Promise.all([
+        const [txs, bgs, yearTxs] = await Promise.all([
           getSpendingTransactions(sd, ed),
           getCategoryBudgets(),
+          getSpendingTransactions(yearStart, yearEnd),
         ]);
         if (!cancelled) {
           setTransactions(txs);
           setBudgets(bgs);
+
+          // Compute year-to-date totals for annual budget categories
+          const annualCategoryIds = new Set(
+            bgs.filter((b) => b.budgetType === "annual").map((b) => b.categoryId)
+          );
+          const annualMap = new Map<string, number>();
+          for (const tx of yearTxs) {
+            if (annualCategoryIds.has(tx.categoryId)) {
+              const converted = convertCurrency(
+                tx.amount,
+                tx.currency,
+                displayCurrency,
+                rates
+              );
+              annualMap.set(
+                tx.categoryId,
+                (annualMap.get(tx.categoryId) ?? 0) + converted
+              );
+            }
+          }
+          setAnnualSpending(annualMap);
         }
       } catch (error) {
         console.error("Failed to fetch analytics data:", error);
@@ -146,7 +187,7 @@ export function AnalyticsClient({
     return () => {
       cancelled = true;
     };
-  }, [year, month]);
+  }, [year, month, displayCurrency, rates]);
 
   const goToPrevMonth = () => {
     if (month === 0) {
@@ -172,7 +213,8 @@ export function AnalyticsClient({
     displayCurrency,
     rates,
     dayOfMonth,
-    daysInMonth
+    daysInMonth,
+    annualSpending
   );
   const editingTxCategory = editingTx
     ? (SPENDING_CATEGORIES.find((c) => c.id === editingTx.categoryId) ?? null)

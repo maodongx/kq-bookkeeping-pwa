@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Input, Label, Modal, TextField, toast } from "@heroui/react";
+import type { Key } from "@heroui/react";
+import {
+  Button,
+  Input,
+  Label,
+  Modal,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  toast,
+} from "@heroui/react";
 import { NativeSelect } from "@/components/ui/native-select";
 import { upsertCategoryBudget } from "@/lib/bookkeeping-data";
 import type { Currency } from "@/lib/types";
@@ -24,10 +34,15 @@ const CURRENCY_OPTIONS: Array<{ value: Currency; label: string }> = [
   { value: "CNY", label: "¥ CNY" },
 ];
 
+type BudgetType = "monthly" | "annual";
+
 /**
- * Edit (or create) the monthly budget for one category. Budgets are
- * shared across the household, so no user id is needed — the RLS
- * policy lets any authenticated user write.
+ * Edit (or create) the budget for one category. Budgets are shared
+ * across the household, so no user id is needed — the RLS policy lets
+ * any authenticated user write.
+ *
+ * Supports both monthly (resets each month) and annual (Jan 1 - Dec 31)
+ * budget types.
  */
 export function BudgetSettingsModal({
   category,
@@ -37,10 +52,13 @@ export function BudgetSettingsModal({
   onSave,
 }: BudgetSettingsModalProps) {
   const [amount, setAmount] = useState(
-    String(currentBudget?.monthlyBudget ?? "")
+    String(currentBudget?.budgetAmount ?? "")
   );
   const [currency, setCurrency] = useState<Currency>(
     currentBudget?.currency ?? "JPY"
+  );
+  const [budgetType, setBudgetType] = useState<BudgetType>(
+    currentBudget?.budgetType ?? "monthly"
   );
   const [isSaving, setIsSaving] = useState(false);
 
@@ -52,8 +70,9 @@ export function BudgetSettingsModal({
     try {
       const saved = await upsertCategoryBudget({
         categoryId: category.id,
-        monthlyBudget: numAmount,
+        budgetAmount: numAmount,
         currency,
+        budgetType,
       });
       onSave(saved);
       toast.success("预算已保存");
@@ -81,8 +100,26 @@ export function BudgetSettingsModal({
           </Modal.Header>
           <Modal.Body>
             <div className="flex flex-col gap-4">
+              {/* Budget type toggle */}
+              <div className="flex justify-center">
+                <ToggleButtonGroup
+                  aria-label="预算类型"
+                  selectionMode="single"
+                  disallowEmptySelection
+                  selectedKeys={new Set<Key>([budgetType])}
+                  onSelectionChange={(keys) => {
+                    const next = [...keys][0];
+                    if (next) setBudgetType(next as BudgetType);
+                  }}
+                >
+                  <ToggleButton id="monthly">月度</ToggleButton>
+                  <ToggleButtonGroup.Separator />
+                  <ToggleButton id="annual">年度</ToggleButton>
+                </ToggleButtonGroup>
+              </div>
+
               <TextField>
-                <Label>月度预算</Label>
+                <Label>{budgetType === "annual" ? "年度预算" : "月度预算"}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -104,6 +141,12 @@ export function BudgetSettingsModal({
                   ))}
                 </NativeSelect>
               </TextField>
+
+              {budgetType === "annual" && (
+                <p className="text-xs text-muted">
+                  年度预算从1月1日至12月31日，显示全年累计支出和剩余额度
+                </p>
+              )}
             </div>
           </Modal.Body>
           <Modal.Footer>

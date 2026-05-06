@@ -121,7 +121,7 @@ export function CategoryBreakdown({
                 <div className="flex items-center justify-between gap-3 border-b border-separator px-3 py-2 text-xs">
                   <span className="text-muted">
                     {summary.budget !== null
-                      ? `预算 ${formatCurrency(summary.budget, displayCurrency)}`
+                      ? `${summary.budgetType === "annual" ? "年度预算" : "预算"} ${formatCurrency(summary.budget, displayCurrency)}`
                       : "未设预算"}
                   </span>
                   <button
