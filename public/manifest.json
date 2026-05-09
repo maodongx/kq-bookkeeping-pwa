@@ -2,7 +2,7 @@
   "name": "KQ 记账",
   "short_name": "KQ记账",
   "description": "家庭资产管理",
-  "start_url": "/",
+  "start_url": "/spending",
   "display": "standalone",
   "background_color": "#f5f5f7",
   "theme_color": "#4968d9",

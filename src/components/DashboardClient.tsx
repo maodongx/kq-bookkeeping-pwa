@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import type { Key } from "@heroui/react";
 import {
   Asset,
@@ -49,6 +50,13 @@ function fmtPct(pct: number | null): string {
 const REFRESH_COOLDOWN_KEY = "kq:last-price-refresh";
 const REFRESH_COOLDOWN_MS = 25 * 60 * 1000;
 
+/**
+ * Persist the "hide 总资产" preference so the number stays hidden across
+ * reloads — useful when the user is about to show their phone to
+ * someone and doesn't want to re-toggle every time.
+ */
+const HIDE_WEALTH_STORAGE_KEY = "kq:hide-total-wealth";
+
 export function DashboardClient({
   assets,
   rawAssets,
@@ -70,7 +78,34 @@ export function DashboardClient({
 }) {
   const [currency, setCurrency] = useState<Currency>(defaultCurrency);
   const [range, setRange] = useState<TimeRange>("3M");
+  // `null` until the localStorage read completes, so we render "••••"
+  // placeholder instead of briefly flashing the true value for users
+  // who had it hidden.
+  const [hideWealth, setHideWealth] = useState<boolean | null>(null);
   const router = useRouter();
+
+  // Load the persisted hide preference on mount. The read touches an
+  // external system (localStorage) so it has to live in an effect per
+  // React Compiler's purity rules.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(HIDE_WEALTH_STORAGE_KEY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHideWealth(stored === "1");
+  }, []);
+
+  const toggleHideWealth = useCallback(() => {
+    setHideWealth((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          HIDE_WEALTH_STORAGE_KEY,
+          next ? "1" : "0"
+        );
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -149,9 +184,21 @@ export function DashboardClient({
       {hasAssets ? (
         <Card className="py-2 text-center">
           <Card.Content>
-            <p className="text-sm text-muted">总资产</p>
+            <div className="flex items-center justify-center gap-2">
+              <p className="text-sm text-muted">总资产</p>
+              <button
+                type="button"
+                onClick={toggleHideWealth}
+                className="text-muted transition-transform active:scale-95"
+                aria-label={hideWealth ? "显示金额" : "隐藏金额"}
+              >
+                {hideWealth ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
             <p className="text-3xl font-bold tabular-nums">
-              {formatCurrency(stats.netWorth, currency)}
+              {hideWealth === null || hideWealth
+                ? "••••••"
+                : formatCurrency(stats.netWorth, currency)}
             </p>
           </Card.Content>
         </Card>
