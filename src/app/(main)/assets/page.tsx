@@ -7,6 +7,7 @@ import { computeHolding } from "@/lib/asset-calculations";
 import { convertCurrency, fetchLatestRates } from "@/lib/exchange-rates";
 import { AssetsClient, CategoryGroup } from "@/components/AssetsClient";
 import { DownloadAssetsButton } from "@/components/DownloadAssetsButton";
+import { RecentTransactions } from "@/components/RecentTransactions";
 
 /**
  * Show categories in a predictable order regardless of how assets were
@@ -120,11 +121,14 @@ async function AssetsBody() {
   const totalWealth = groups.reduce((sum, g) => sum + g.totalValue, 0);
 
   return (
-    <AssetsClient
-      groups={groups}
-      totalWealth={totalWealth}
-      displayCurrency={displayCurrency}
-    />
+    <>
+      <AssetsClient
+        groups={groups}
+        totalWealth={totalWealth}
+        displayCurrency={displayCurrency}
+      />
+      <RecentTransactions assets={assetList} transactions={txList} />
+    </>
   );
 }
 
