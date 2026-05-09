@@ -51,7 +51,14 @@ function buildRateMapForDate(
   return rates;
 }
 
-function getAssetValueOnDate(
+/**
+ * Market value of an asset on a specific historical date in the asset's
+ * native currency. Delegates transaction replay to `computeHolding` and
+ * looks up the latest price snapshot on or before `date` for investments.
+ * Shared by the net-worth time series and per-asset period returns on
+ * the assets tab.
+ */
+export function getAssetValueOnDate(
   asset: Asset,
   transactions: Transaction[],
   priceSnapshots: AssetPriceSnapshot[],

@@ -1,8 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
-import { Accordion, Card, Chip } from "@heroui/react";
+import type { Key } from "@heroui/react";
+import {
+  Accordion,
+  Card,
+  Chip,
+  ToggleButton,
+  ToggleButtonGroup,
+} from "@heroui/react";
 import {
   AssetCategory,
   AssetTag,
@@ -16,6 +24,15 @@ import {
   gainLossTextClass,
 } from "@/lib/currency";
 import { cn } from "@/lib/utils";
+
+/** Which per-asset return to display in the accordion rows. */
+type ReturnMode = "allTime" | "month" | "day";
+
+const RETURN_MODE_LABELS: Record<ReturnMode, string> = {
+  allTime: "总收益",
+  month: "近1月",
+  day: "当日",
+};
 
 /**
  * A single row in the per-category list. marketValue and gainLoss are
@@ -32,10 +49,18 @@ export interface AssetRow {
   riskLevel: RiskLevel | null;
   /** Market value in the display currency. */
   valueInDisplay: number;
-  /** Gain/loss in the display currency. Null for non-investments. */
+  /** All-time gain (or "总收益"): current gain/loss in display currency. Null for non-investments. */
   gainLossInDisplay: number | null;
-  /** Gain/loss as a percentage of cost. Null for non-investments. */
+  /** All-time gain as a percentage of cost. Null for non-investments. */
   gainPct: number | null;
+  /** Value change over the last ~30 days in display currency. Null when not computable. */
+  monthDeltaInDisplay: number | null;
+  /** Month-over-month % change. Null when past value is 0 or missing. */
+  monthPct: number | null;
+  /** Value change since yesterday in display currency. Null when not computable. */
+  dayDeltaInDisplay: number | null;
+  /** Day-over-day % change. Null when past value is 0 or missing. */
+  dayPct: number | null;
 }
 
 export interface CategoryGroup {
@@ -76,6 +101,22 @@ export function AssetsClient({
   totalWealth: number;
   displayCurrency: Currency;
 }) {
+  const [returnMode, setReturnMode] = useState<ReturnMode>("allTime");
+
+  // Per-row, pick out the value/pct pair that matches the selected mode.
+  function selectedReturn(a: AssetRow): {
+    value: number | null;
+    pct: number | null;
+  } {
+    if (returnMode === "allTime") {
+      return { value: a.gainLossInDisplay, pct: a.gainPct };
+    }
+    if (returnMode === "month") {
+      return { value: a.monthDeltaInDisplay, pct: a.monthPct };
+    }
+    return { value: a.dayDeltaInDisplay, pct: a.dayPct };
+  }
+
   return (
     <>
       {groups.length === 0 ? (
@@ -95,7 +136,31 @@ export function AssetsClient({
         // Default Accordion (no `allowsMultipleExpanded`) collapses other
         // categories when one is opened — matches the user's "drill into
         // one category at a time" request.
-        <Accordion variant="surface">
+        <>
+          {/* Return-mode toggle — centered, above the accordion.
+              Switches the per-asset return display between 总收益 /
+              近1月 / 当日 without re-fetching; the three values are
+              precomputed on the server and attached to each row. */}
+          <div className="flex justify-center">
+            <ToggleButtonGroup
+              aria-label="收益模式"
+              selectionMode="single"
+              disallowEmptySelection
+              selectedKeys={new Set<Key>([returnMode])}
+              onSelectionChange={(keys) => {
+                const next = [...keys][0];
+                if (next) setReturnMode(next as ReturnMode);
+              }}
+            >
+              {(["allTime", "month", "day"] as const).map((m, i) => (
+                <ToggleButton key={m} id={m}>
+                  {i > 0 && <ToggleButtonGroup.Separator />}
+                  {RETURN_MODE_LABELS[m]}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </div>
+          <Accordion variant="surface">
           {groups.map((g) => (
             <Accordion.Item key={g.category} id={g.category}>
               <Accordion.Heading>
@@ -157,22 +222,22 @@ export function AssetsClient({
                                 displayCurrency
                               )}
                             </p>
-                            {a.gainLossInDisplay != null &&
-                              a.gainPct != null && (
+                            {(() => {
+                              const r = selectedReturn(a);
+                              if (r.value == null || r.pct == null) return null;
+                              return (
                                 <p
                                   className={cn(
                                     "text-xs tabular-nums",
-                                    gainLossTextClass(a.gainLossInDisplay)
+                                    gainLossTextClass(r.value)
                                   )}
                                 >
-                                  {formatSigned(
-                                    a.gainLossInDisplay,
-                                    displayCurrency
-                                  )}{" "}
-                                  ({a.gainPct >= 0 ? "+" : ""}
-                                  {a.gainPct.toFixed(2)}%)
+                                  {formatSigned(r.value, displayCurrency)} (
+                                  {r.pct >= 0 ? "+" : ""}
+                                  {r.pct.toFixed(2)}%)
                                 </p>
-                              )}
+                              );
+                            })()}
                           </div>
                         </Link>
                       </li>
@@ -183,6 +248,7 @@ export function AssetsClient({
             </Accordion.Item>
           ))}
         </Accordion>
+        </>
       )}
     </>
   );

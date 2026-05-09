@@ -1,9 +1,17 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { Asset, AssetCategory, Currency, Transaction } from "@/lib/types";
+import {
+  Asset,
+  AssetCategory,
+  AssetPriceSnapshot,
+  Currency,
+  Transaction,
+} from "@/lib/types";
 import { hasPerAssetGainLoss } from "@/lib/currency";
 import { computeHolding } from "@/lib/asset-calculations";
+import { getAssetValueOnDate } from "@/lib/chart-utils";
+import { daysAgoLocal } from "@/lib/date";
 import { convertCurrency, fetchLatestRates } from "@/lib/exchange-rates";
 import { AssetsClient, CategoryGroup } from "@/components/AssetsClient";
 import { DownloadAssetsButton } from "@/components/DownloadAssetsButton";
@@ -54,6 +62,7 @@ async function AssetsBody() {
   const [
     { data: assets },
     { data: transactions },
+    { data: priceSnapshots },
     rates,
     {
       data: { user },
@@ -61,6 +70,7 @@ async function AssetsBody() {
   ] = await Promise.all([
     supabase.from("assets").select("*"),
     supabase.from("transactions").select("*"),
+    supabase.from("asset_price_snapshots").select("*").order("date"),
     fetchLatestRates(supabase),
     supabase.auth.getUser(),
   ]);
@@ -70,6 +80,13 @@ async function AssetsBody() {
 
   const assetList = (assets || []) as Asset[];
   const txList = (transactions || []) as Transaction[];
+  const priceSnaps = (priceSnapshots || []) as AssetPriceSnapshot[];
+
+  // Reference dates for month-over-month and day-over-day returns.
+  // `getAssetValueOnDate` walks backwards from these to find the
+  // latest snapshot on or before — tolerant of weekend gaps.
+  const monthAgo = daysAgoLocal(30);
+  const dayAgo = daysAgoLocal(1);
 
   // Bucket assets into per-category groups and sum in the display currency.
   // Per-asset marketValue and gainLoss come from the canonical computeHolding
@@ -78,6 +95,26 @@ async function AssetsBody() {
   for (const asset of assetList) {
     const { marketValue, gainLoss, gainPct } = computeHolding(asset, txList);
     const showGain = hasPerAssetGainLoss(asset.category);
+
+    // Historical values in the asset's native currency. For categories
+    // without per-asset gain (bank/cash/other) we still skip — those
+    // rows don't display a return.
+    let monthPct: number | null = null;
+    let monthDelta: number | null = null;
+    let dayPct: number | null = null;
+    let dayDelta: number | null = null;
+    if (showGain) {
+      const monthValue = getAssetValueOnDate(asset, txList, priceSnaps, monthAgo);
+      const dayValue = getAssetValueOnDate(asset, txList, priceSnaps, dayAgo);
+      if (monthValue > 0) {
+        monthDelta = marketValue - monthValue;
+        monthPct = (monthDelta / monthValue) * 100;
+      }
+      if (dayValue > 0) {
+        dayDelta = marketValue - dayValue;
+        dayPct = (dayDelta / dayValue) * 100;
+      }
+    }
 
     const row = {
       id: asset.id,
@@ -95,6 +132,16 @@ async function AssetsBody() {
         ? convertCurrency(gainLoss, asset.currency, displayCurrency, rates)
         : null,
       gainPct: showGain ? gainPct : null,
+      monthDeltaInDisplay:
+        monthDelta != null
+          ? convertCurrency(monthDelta, asset.currency, displayCurrency, rates)
+          : null,
+      monthPct,
+      dayDeltaInDisplay:
+        dayDelta != null
+          ? convertCurrency(dayDelta, asset.currency, displayCurrency, rates)
+          : null,
+      dayPct,
     };
 
     let group = groupMap.get(asset.category);
