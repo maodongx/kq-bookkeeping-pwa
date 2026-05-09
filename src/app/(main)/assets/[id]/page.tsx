@@ -90,11 +90,15 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
 
       {hasPerAssetGainLoss(a.category) ? (
         // Investments (buy/sell) and mmf/managed (deposit/withdraw/adjustment)
-        // both use AddTransactionForm. For mmf/managed this is important:
-        // the form lets the user explicitly pick deposit (new capital) vs
-        // adjustment (NAV update / interest), so a paycheck arriving is not
-        // silently classified as market gain.
-        <AddTransactionForm assetId={a.id} category={a.category} />
+        // both use AddTransactionForm. For mmf/managed the form also takes
+        // `currentBalance` so adjustments prompt for the new total balance
+        // (matching UpdateBalanceForm's UX for bank/cash) instead of
+        // making the user do delta math.
+        <AddTransactionForm
+          assetId={a.id}
+          category={a.category}
+          currentBalance={balance}
+        />
       ) : (
         // Bank / cash / other — quick "set current balance" UX. Creates an
         // adjustment; users treat this as the running balance for daily use.

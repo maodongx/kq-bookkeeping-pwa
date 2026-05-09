@@ -75,6 +75,7 @@ export function TransactionFields({
   values,
   onChange,
   category,
+  currentBalance,
 }: {
   values: TransactionFormValues;
   onChange: <K extends keyof TransactionFormValues>(
@@ -82,9 +83,20 @@ export function TransactionFields({
     value: TransactionFormValues[K]
   ) => void;
   category: AssetCategory;
+  /**
+   * Current balance of the asset. Only consulted for non-investment
+   * categories when the user picks `调整` — the amount input then
+   * prompts for the new total balance instead of a delta (mirroring
+   * UpdateBalanceForm's UX for bank/cash). Omit on edit forms so the
+   * stored delta remains editable as-is.
+   */
+  currentBalance?: number;
 }) {
   const inv = isInvestment(category);
   const availableTypes = getAvailableTxTypes(category);
+  const isAdjustmentAsNewBalance =
+    !inv && values.type === "adjustment" && currentBalance !== undefined;
+  const amountPlaceholder = isAdjustmentAsNewBalance ? "新余额" : "金额";
 
   return (
     <>
@@ -129,7 +141,7 @@ export function TransactionFields({
         <Input
           type="number"
           step="any"
-          placeholder="金额"
+          placeholder={amountPlaceholder}
           value={values.amount}
           onChange={(e) => onChange("amount", e.target.value)}
           required
