@@ -24,6 +24,7 @@ import {
   TIME_RANGE_LABELS,
   computeNetWorthTimeSeries,
 } from "@/lib/chart-utils";
+import { todayUTC } from "@/lib/date";
 import { Card, ToggleButton, ToggleButtonGroup } from "@heroui/react";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { AllocationPieChart } from "./AllocationPieChart";
@@ -148,18 +149,39 @@ export function DashboardClient({
     [assets, rawAssets, transactions, priceSnapshots, rateSnapshots, rates, currency]
   );
 
-  const timeSeries = useMemo(
-    () =>
-      computeNetWorthTimeSeries(
-        rawAssets,
-        transactions,
-        priceSnapshots,
-        rateSnapshots,
-        currency,
-        range
-      ),
-    [rawAssets, transactions, priceSnapshots, rateSnapshots, currency, range]
-  );
+  const timeSeries = useMemo(() => {
+    const series = computeNetWorthTimeSeries(
+      rawAssets,
+      transactions,
+      priceSnapshots,
+      rateSnapshots,
+      currency,
+      range
+    );
+
+    // The snapshot series ends on the last *snapshotted* day (yesterday
+    // until today's price refresh has run). The 总资产 card, by contrast,
+    // shows live net worth from current_price at the latest FX rates.
+    // Pin the chart's final point to that same live value so the line's
+    // right edge always matches the card. If today already has a snapshot
+    // row, overwrite it (same live number) rather than append a duplicate
+    // x-value. This is display-only — the Modified-Dietz stats compute off
+    // the raw snapshot series and are unaffected.
+    const today = todayUTC();
+    const livePoint = { date: today, netWorth: stats.netWorth };
+    if (series.length > 0 && series[series.length - 1].date === today) {
+      return [...series.slice(0, -1), livePoint];
+    }
+    return [...series, livePoint];
+  }, [
+    rawAssets,
+    transactions,
+    priceSnapshots,
+    rateSnapshots,
+    currency,
+    range,
+    stats.netWorth,
+  ]);
 
   const hasAssets = assets.length > 0;
 
