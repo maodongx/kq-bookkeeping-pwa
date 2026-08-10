@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Clock } from "lucide-react";
 import type { Key } from "@heroui/react";
 import {
   Accordion,
@@ -23,6 +23,7 @@ import {
   formatCurrency,
   gainLossTextClass,
 } from "@/lib/currency";
+import { relativeDayLabel } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 /** Which per-asset return to display in the accordion rows. */
@@ -47,6 +48,8 @@ export interface AssetRow {
   symbol: string | null;
   tag: AssetTag | null;
   riskLevel: RiskLevel | null;
+  /** Date (YYYY-MM-DD) of this asset's most recent transaction. Null if none. */
+  lastTxDate: string | null;
   /** Market value in the display currency. */
   valueInDisplay: number;
   /** All-time gain (or "总收益"): current gain/loss in display currency. Null for non-investments. */
@@ -211,6 +214,18 @@ export function AssetsClient({
                               {a.riskLevel && (
                                 <Chip variant="tertiary" size="sm" className="!text-muted">
                                   {RISK_LABELS[a.riskLevel]}
+                                </Chip>
+                              )}
+                              {a.lastTxDate && (
+                                <Chip
+                                  variant="tertiary"
+                                  size="sm"
+                                  className="!text-muted"
+                                >
+                                  <Clock width={12} />
+                                  <Chip.Label>
+                                    {relativeDayLabel(a.lastTxDate)}
+                                  </Chip.Label>
                                 </Chip>
                               )}
                             </div>

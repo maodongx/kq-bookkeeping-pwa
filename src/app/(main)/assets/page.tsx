@@ -88,6 +88,17 @@ async function AssetsBody() {
   const monthAgo = daysAgoLocal(30);
   const dayAgo = daysAgoLocal(1);
 
+  // Most recent transaction date per asset — the max `date` (YYYY-MM-DD)
+  // across that asset's transactions. Surfaced in the accordion rows so
+  // the user can see at a glance which positions they've touched recently.
+  const lastTxByAsset = new Map<string, string>();
+  for (const tx of txList) {
+    const current = lastTxByAsset.get(tx.asset_id);
+    if (!current || tx.date > current) {
+      lastTxByAsset.set(tx.asset_id, tx.date);
+    }
+  }
+
   // Bucket assets into per-category groups and sum in the display currency.
   // Per-asset marketValue and gainLoss come from the canonical computeHolding
   // helper so the numbers match the detail page and the charts.
@@ -122,6 +133,7 @@ async function AssetsBody() {
       symbol: asset.symbol,
       tag: asset.tag,
       riskLevel: asset.risk_level,
+      lastTxDate: lastTxByAsset.get(asset.id) ?? null,
       valueInDisplay: convertCurrency(
         marketValue,
         asset.currency,

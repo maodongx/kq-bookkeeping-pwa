@@ -78,6 +78,33 @@ export function daysAgoLocal(n: number): string {
   return formatLocalDate(d);
 }
 
+/**
+ * Human-friendly "how long ago" label for a `YYYY-MM-DD` date, relative
+ * to today in the user's local timezone. Used for the per-asset "last
+ * transaction" marker so the user can scan which positions they've
+ * touched recently.
+ *
+ * Returns "今天" / "昨天" / "N天前" for the last week, then falls back to
+ * the plain `YYYY-MM-DD` for older dates (a relative count stops being
+ * useful once it's "37天前"). Future dates (possible if a user backdates
+ * forward) just show the date. Returns "" for empty/invalid input.
+ */
+export function relativeDayLabel(date: string): string {
+  if (!date) return "";
+  const then = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(then.getTime())) return "";
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round(
+    (today.getTime() - then.getTime()) / 86_400_000
+  );
+  if (diffDays < 0) return date;
+  if (diffDays === 0) return "今天";
+  if (diffDays === 1) return "昨天";
+  if (diffDays <= 6) return `${diffDays}天前`;
+  return date;
+}
+
 /** Format a Date as `YYYY-MM-DD` using its local-time fields. */
 export function formatLocalDate(d: Date): string {
   const y = d.getFullYear();
