@@ -7,6 +7,7 @@ import {
   ResponsiveContainer,
   Area,
   AreaChart,
+  CartesianGrid,
 } from "recharts";
 import { Currency } from "@/lib/types";
 import { formatCurrency } from "@/lib/currency";
@@ -42,6 +43,19 @@ export function NetWorthLineChart({
     );
   }
 
+  // Net worth is a trend metric, not a magnitude comparison, so a zero-anchored
+  // y-axis is wrong here: it squashes the real day-to-day movement into a flat
+  // line at the top of the chart. Instead, frame the axis around the actual
+  // value range with ~8% headroom on each side so the variation fills the plot.
+  // Guard the degenerate flat-series case (min === max) with an absolute pad.
+  const values = data.map((d) => d.netWorth);
+  const dataMin = Math.min(...values);
+  const dataMax = Math.max(...values);
+  const span = dataMax - dataMin;
+  const pad = span > 0 ? span * 0.08 : Math.max(Math.abs(dataMax) * 0.05, 1);
+  const yMin = dataMin - pad;
+  const yMax = dataMax + pad;
+
   return (
     <Card>
       <Card.Header>
@@ -56,6 +70,11 @@ export function NetWorthLineChart({
                 <stop offset="100%" stopColor={ACCENT} stopOpacity={0} />
               </linearGradient>
             </defs>
+            <CartesianGrid
+              vertical={false}
+              stroke="var(--border)"
+              strokeOpacity={0.5}
+            />
             <XAxis
               dataKey="date"
               tick={{ fontSize: 11 }}
@@ -66,11 +85,12 @@ export function NetWorthLineChart({
               interval="preserveStartEnd"
             />
             <YAxis
+              domain={[yMin, yMax]}
               tick={{ fontSize: 11 }}
               tickFormatter={(v: number) =>
                 v >= 10000
-                  ? `${(v / 10000).toFixed(0)}万`
-                  : v.toLocaleString()
+                  ? `${(v / 10000).toFixed(1)}万`
+                  : Math.round(v).toLocaleString()
               }
               width={50}
             />
