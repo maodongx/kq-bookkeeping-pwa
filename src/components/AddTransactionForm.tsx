@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AssetCategory } from "@/lib/types";
 import { getAvailableTxTypes, isInvestment } from "@/lib/currency";
+import { fetchLiveBalance } from "@/lib/live-balance";
 import { todayLocal } from "@/lib/date";
 import { Card, Button, toast } from "@heroui/react";
 import {
@@ -99,10 +100,28 @@ export function AddTransactionForm({
       // UpdateBalanceForm so 调整 semantics are consistent across all
       // balance-model categories.
       const newBalance = parseFloat(values.amount);
-      const delta = newBalance - currentBalance;
-      if (!isFinite(delta) || delta === 0) {
-        toast.danger("余额未变化");
+      if (!Number.isFinite(newBalance)) {
+        toast.danger("请输入有效金额");
         setLoading(false);
+        return;
+      }
+
+      // Same stale-basis hazard as UpdateBalanceForm: the input is a target
+      // balance but the stored value is a delta, so it has to be computed
+      // against the balance that's current *now*, not at page render.
+      const liveBalance = await fetchLiveBalance(assetId, category);
+      if (liveBalance === null) {
+        toast.danger("无法读取当前余额，请重试");
+        setLoading(false);
+        return;
+      }
+
+      const delta = newBalance - liveBalance;
+      if (delta === 0) {
+        toast.success("余额无需调整");
+        setLoading(false);
+        setOpen(false);
+        router.refresh();
         return;
       }
       payload = {

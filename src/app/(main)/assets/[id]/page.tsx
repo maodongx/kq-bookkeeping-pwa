@@ -109,7 +109,12 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
         reconcile against a statement.
       */}
       {!hasPerAssetGainLoss(a.category) && (
-        <UpdateBalanceForm assetId={a.id} currentBalance={balance} currency={a.currency} />
+        <UpdateBalanceForm
+          assetId={a.id}
+          category={a.category}
+          currentBalance={balance}
+          currency={a.currency}
+        />
       )}
 
       <TransactionList transactions={txList} category={a.category} currency={a.currency} />

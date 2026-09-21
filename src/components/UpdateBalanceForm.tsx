@@ -3,17 +3,25 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Currency } from "@/lib/types";
+import { AssetCategory, Currency } from "@/lib/types";
 import { formatCurrency, CURRENCY_SYMBOLS } from "@/lib/currency";
+import { fetchLiveBalance } from "@/lib/live-balance";
 import { todayLocal } from "@/lib/date";
 import { Card, Button, Input, toast } from "@heroui/react";
 
 export function UpdateBalanceForm({
   assetId,
+  category,
   currentBalance,
   currency,
 }: {
   assetId: string;
+  /** Needed to re-derive the balance at submit time. */
+  category: AssetCategory;
+  /**
+   * Balance as of page render, shown as "当前余额". Display only — the stored
+   * delta is computed against a fresh read, since this value can be stale.
+   */
   currentBalance: number;
   currency: Currency;
 }) {
@@ -29,11 +37,33 @@ export function UpdateBalanceForm({
     setLoading(true);
 
     const newBalance = parseFloat(value);
-    const diff = newBalance - currentBalance;
+    if (!Number.isFinite(newBalance)) {
+      toast.danger("请输入有效金额");
+      setLoading(false);
+      return;
+    }
 
-    if (!Number.isFinite(diff) || diff === 0) {
+    // Compute the delta against a *fresh* balance, not the one from page
+    // render. The render-time figure is up to 30s stale (router cache) and can
+    // be older still if the other household member just recorded something —
+    // and since this writes a delta, a stale basis silently offsets the
+    // resulting balance by exactly the amount we missed.
+    const liveBalance = await fetchLiveBalance(assetId, category);
+    if (liveBalance === null) {
+      toast.danger("无法读取当前余额，请重试");
+      setLoading(false);
+      return;
+    }
+
+    const diff = newBalance - liveBalance;
+
+    if (diff === 0) {
       setOpen(false);
       setLoading(false);
+      // Say something: with a stale display this can look like a no-op even
+      // though the user did change the number they saw.
+      toast.success("余额无需调整");
+      router.refresh();
       return;
     }
 
@@ -49,7 +79,9 @@ export function UpdateBalanceForm({
       price: 1,
       amount: diff,
       date: todayLocal(),
-      note: note.trim() || `余额更新: ${formatCurrency(currentBalance, currency)} → ${formatCurrency(newBalance, currency)}`,
+      // Record the balance we actually adjusted *from*, so the note matches
+      // the stored delta even when the form was showing a stale figure.
+      note: note.trim() || `余额更新: ${formatCurrency(liveBalance, currency)} → ${formatCurrency(newBalance, currency)}`,
     });
 
     if (error) {
