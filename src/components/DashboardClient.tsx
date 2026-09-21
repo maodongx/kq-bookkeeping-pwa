@@ -22,7 +22,7 @@ import {
 import {
   TimeRange,
   TIME_RANGE_LABELS,
-  computeNetWorthTimeSeries,
+  computeNetWorthChartSeries,
 } from "@/lib/chart-utils";
 import { Card, ToggleButton, ToggleButtonGroup } from "@heroui/react";
 import { CurrencySwitcher } from "./CurrencySwitcher";
@@ -124,15 +124,26 @@ export function DashboardClient({
    * currency toggle used to be display-only; the persistent version
    * lived on a dedicated settings page. Merging behaviors here means
    * one tap now both switches the display AND updates user_metadata,
-   * so the choice sticks across devices on next load. Fire-and-forget
-   * — if the write fails the user only loses the default on next
-   * refresh, not the current view.
+   * so the choice sticks across devices on next load.
+   *
+   * The `router.refresh()` matters: /analytics and /details read
+   * `default_currency` server-side, and `staleTimes.dynamic = 30` means a
+   * tab-over within 30s would otherwise replay a cached RSC payload still
+   * rendered in the old currency.
    */
-  const handleCurrencyChange = useCallback((c: Currency) => {
-    setCurrency(c);
-    const supabase = createClient();
-    supabase.auth.updateUser({ data: { default_currency: c } });
-  }, []);
+  const handleCurrencyChange = useCallback(
+    (c: Currency) => {
+      setCurrency(c);
+      const supabase = createClient();
+      supabase.auth
+        .updateUser({ data: { default_currency: c } })
+        .then(() => router.refresh())
+        // A failed write only costs the persisted default, not the current
+        // view, so there's nothing actionable to show the user.
+        .catch(() => {});
+    },
+    [router]
+  );
 
   const stats = useMemo(
     () =>
@@ -148,17 +159,20 @@ export function DashboardClient({
     [assets, rawAssets, transactions, priceSnapshots, rateSnapshots, rates, currency]
   );
 
+  // Ends on a live "now" point, so the chart's last value is the same number
+  // as the 总资产 card above it.
   const timeSeries = useMemo(
     () =>
-      computeNetWorthTimeSeries(
+      computeNetWorthChartSeries(
         rawAssets,
         transactions,
         priceSnapshots,
         rateSnapshots,
         currency,
-        range
+        range,
+        rates
       ),
-    [rawAssets, transactions, priceSnapshots, rateSnapshots, currency, range]
+    [rawAssets, transactions, priceSnapshots, rateSnapshots, currency, range, rates]
   );
 
   const hasAssets = assets.length > 0;
