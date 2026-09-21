@@ -113,8 +113,12 @@ export function BudgetSettingsModal({
                   }}
                 >
                   <ToggleButton id="monthly">月度</ToggleButton>
-                  <ToggleButtonGroup.Separator />
-                  <ToggleButton id="annual">年度</ToggleButton>
+                  {/* Separator goes inside the following button — see the same
+                      fix in AnalyticsClient. */}
+                  <ToggleButton id="annual">
+                    <ToggleButtonGroup.Separator />
+                    年度
+                  </ToggleButton>
                 </ToggleButtonGroup>
               </div>
 

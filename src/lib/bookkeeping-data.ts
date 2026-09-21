@@ -20,6 +20,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import type { Currency } from "@/lib/types";
 import type {
   SpendingCategory,
   SpendingTransaction,
@@ -85,16 +87,31 @@ export async function getSpendingTransactions(
   endDate: string
 ): Promise<SpendingTransaction[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("spending_transactions")
-    .select("*")
-    .gte("date", startDate)
-    .lte("date", endDate)
-    .order("date", { ascending: false });
+  // Paginated: a full calendar year of household spending can exceed
+  // Supabase's per-response row cap, and because this is ordered newest-first
+  // the rows silently dropped would be January's — quietly under-reporting
+  // every annual total and annual budget percentage.
+  const { rows: data, error } = await fetchAllRows<{
+    id: string;
+    category_id: string;
+    amount: number;
+    currency: Currency;
+    date: string;
+    notes: string | null;
+    created_at: string;
+  }>((from, to) =>
+    supabase
+      .from("spending_transactions")
+      .select("*")
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .order("date", { ascending: false })
+      .range(from, to)
+  );
 
-  if (error) throw error;
+  if (error) throw new Error(error);
 
-  return (data ?? []).map((row) => ({
+  return data.map((row) => ({
     id: row.id,
     categoryId: row.category_id,
     amount: row.amount,
@@ -293,13 +310,21 @@ export async function getTopNotesForCategory(
 export const PREDICTION_EXCLUDED_CATEGORY_IDS = new Set<string>(["rent"]);
 
 /**
+ * Day of the month before which pace projection is suppressed. Early in the
+ * month a single purchase extrapolates to an absurd monthly total, so the
+ * projection is pure noise until a few days of spending exist.
+ */
+const MIN_DAYS_FOR_PACE_PROJECTION = 5;
+
+/**
  * Classify budget health by projecting current pace to month end.
  *  - `danger`  — strictly over budget. Only actual breaches count as
  *    danger; projections never do.
  *  - `warning` — projected to hit ≥80% (includes projections above
  *    100% that haven't actually breached yet).
  *  - `caution` — projected to hit 60%-80%.
- *  - `none`    — on track or no budget set.
+ *  - `none`    — on track, no budget set, or too early in the month to
+ *    project (see MIN_DAYS_FOR_PACE_PROJECTION).
  */
 export function calculateBudgetWarning(
   spent: number,
@@ -309,6 +334,13 @@ export function calculateBudgetWarning(
 ): BudgetWarningLevel {
   if (budget <= 0) return "none";
   if (spent > budget) return "danger";
+
+  // Too early in the month to extrapolate. On day 1 the projection multiplies
+  // a single purchase by the whole month: one ¥1,600 lunch against a ¥60,000
+  // 食费 budget projects to ¥48,000 (80%) and fires a warning — and the cat
+  // popup — on the month's very first entry. Actual breaches (handled above)
+  // still report regardless of the day.
+  if (dayOfMonth < MIN_DAYS_FOR_PACE_PROJECTION) return "none";
 
   const percentMonthElapsed = dayOfMonth / daysInMonth;
   const projectedSpend =

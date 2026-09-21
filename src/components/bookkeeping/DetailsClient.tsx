@@ -53,7 +53,10 @@ export function DetailsClient({ displayCurrency, rates }: DetailsClientProps) {
   // avoiding off-by-one at midnight UTC.
   useEffect(() => {
     const startStr = daysAgoLocal(90);
-    const endStr = todayLocal();
+    // Deliberately past today: a prepaid or future-dated expense is already
+    // counted in /analytics, so capping the window at today made it impossible
+    // to find or edit here until its date arrived.
+    const endStr = daysAgoLocal(-365);
 
     getSpendingTransactions(startStr, endStr)
       .then(setTransactions)
@@ -104,8 +107,11 @@ export function DetailsClient({ displayCurrency, rates }: DetailsClientProps) {
         setTransactions((prev) => [created, ...prev]);
         toast.success("记账成功");
       }
-    } catch {
+    } catch (e) {
       toast.danger("保存失败");
+      // Re-thrown so the modal keeps the form populated for a retry instead of
+      // clearing it and closing.
+      throw e;
     }
   };
 
@@ -130,17 +136,29 @@ export function DetailsClient({ displayCurrency, rates }: DetailsClientProps) {
     );
   }
 
-  if (transactions.length === 0) {
-    return (
-      <div className="py-12 text-center text-muted">
-        <p className="mb-2 text-4xl">📝</p>
-        <p>暂无支出记录</p>
-      </div>
-    );
-  }
-
   return (
     <>
+      {/*
+        The empty state renders inside the normal tree rather than as an early
+        return. Returning early also skipped the "+" buttons and the modal, so a
+        household with no spending in the window — or one that had just deleted
+        its last entry — had no way to add anything from this page at all, and
+        deleting the final row unmounted the open modal mid-flow.
+      */}
+      {transactions.length === 0 && (
+        <div className="py-12 text-center text-muted">
+          <p className="mb-2 text-4xl">📝</p>
+          <p className="mb-4">暂无支出记录</p>
+          <button
+            type="button"
+            onClick={() => handleAddOnDate(todayLocal())}
+            className="rounded-full bg-[#E6E0F8] px-4 py-2 text-sm font-medium text-[#7C3AED] transition-transform active:scale-95"
+          >
+            + 添加支出
+          </button>
+        </div>
+      )}
+
       <div className="space-y-6">
         {[...grouped.entries()].map(([date, txs]) => (
           <div key={date}>
@@ -215,10 +233,9 @@ export function DetailsClient({ displayCurrency, rates }: DetailsClientProps) {
                 date: editingTx.date,
                 notes: editingTx.notes,
               }
-            : prefillDate
-              ? { amount: 0, currency: "JPY", date: prefillDate, notes: null }
-              : null
+            : null
         }
+        defaultDate={prefillDate}
         onDelete={editingTx ? handleDelete : undefined}
         showCategoryPicker={!editingTx && !selectedCategory}
       />

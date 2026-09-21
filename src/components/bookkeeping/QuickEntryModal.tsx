@@ -40,15 +40,25 @@ interface QuickEntryModalProps {
   category: SpendingCategory | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (entry: SpendingEntry) => void;
+  onSave: (entry: SpendingEntry) => void | Promise<void>;
   /**
    * When provided, the modal pre-fills with these values and represents
    * editing an existing transaction. The caller is still responsible for
    * actually persisting via `onSave` (e.g. updateSpendingTransaction).
    * Caller should set `key={tx.id}` on the modal so state re-inits when
    * the transaction being edited changes.
+   *
+   * Pass this *only* for edits — it's what flips the modal into edit mode.
+   * To pre-fill the date on a create, use `defaultDate`.
    */
   initialValues?: SpendingInitialValues | null;
+  /**
+   * Starting date for a *new* entry. Separate from `initialValues` because
+   * routing a create through `initialValues` also made it look like an edit:
+   * the CTA read 保存 instead of 确认 and the amount box started at the literal
+   * "0", so typing 500 produced "0500".
+   */
+  defaultDate?: string | null;
   /**
    * When provided (edit mode only), renders a muted "删除" button at the
    * bottom that asks for confirmation before firing. Caller handles the
@@ -84,6 +94,7 @@ export function QuickEntryModal({
   onClose,
   onSave,
   initialValues = null,
+  defaultDate = null,
   onDelete,
   showCategoryPicker = false,
 }: QuickEntryModalProps) {
@@ -106,11 +117,14 @@ export function QuickEntryModal({
     initialValues ? String(initialValues.amount) : ""
   );
   const [notes, setNotes] = useState(() => initialValues?.notes ?? "");
-  const [date, setDate] = useState(() => initialValues?.date ?? todayLocal());
+  const [date, setDate] = useState(
+    () => initialValues?.date ?? defaultDate ?? todayLocal()
+  );
   const [currency, setCurrency] = useState<Currency>(
     () => initialValues?.currency ?? "JPY"
   );
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const [confirmDelete, ConfirmDeleteDialog] = useConfirmDialog();
 
@@ -136,22 +150,39 @@ export function QuickEntryModal({
   const reset = () => {
     setAmount("");
     setNotes("");
-    setDate(todayLocal());
+    setDate(defaultDate ?? todayLocal());
     setCurrency("JPY");
     setSuggestions([]);
     if (showCategoryPicker) setPickerSelection(null);
   };
 
-  const handleConfirm = () => {
+  // Awaits the save before resetting and closing. Previously the modal fired
+  // `onSave` un-awaited and immediately wiped its fields, so a failed write
+  // left the user with a toast and nothing to retry from; and because nothing
+  // guarded re-entry, a double-tap during the close animation could insert the
+  // same expense twice (the table has no uniqueness constraint).
+  const handleConfirm = async () => {
+    if (saving) return;
+
     const numeric = parseFloat(amount);
-    if (!category || !isFinite(numeric) || numeric <= 0) return;
-    onSave({
-      categoryId: category.id,
-      amount: numeric,
-      currency,
-      date,
-      notes: notes.trim() || null,
-    });
+    if (!category || !Number.isFinite(numeric) || numeric <= 0) return;
+
+    setSaving(true);
+    try {
+      await onSave({
+        categoryId: category.id,
+        amount: numeric,
+        currency,
+        date,
+        notes: notes.trim() || null,
+      });
+    } catch {
+      // The caller owns error reporting; keep the form intact so the user can
+      // retry without retyping.
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
     reset();
     onClose();
   };
@@ -175,7 +206,7 @@ export function QuickEntryModal({
     onClose();
   };
 
-  const canConfirm = parseFloat(amount) > 0;
+  const canConfirm = parseFloat(amount) > 0 && !saving;
   const isEdit = initialValues != null;
 
   return (

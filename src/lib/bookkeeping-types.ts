@@ -40,10 +40,14 @@ export interface CategoryBudget {
 
 /**
  * Budget health classification driven by pace-based projection.
- *   - `danger`  — already over, or projected to exceed 100%.
- *   - `warning` — projected to hit 80%-100%.
+ *   - `danger`  — actually over budget. Projections never reach `danger`,
+ *     however far over 100% they run.
+ *   - `warning` — projected to hit 80% or more (including above 100%).
  *   - `caution` — projected to hit 60%-80%.
- *   - `none`    — on track or no budget set.
+ *   - `none`    — on track, no budget set, or too early in the month to
+ *     project (see MIN_DAYS_FOR_PACE_PROJECTION in bookkeeping-data.ts).
+ *
+ * See `calculateBudgetWarning` for the authoritative implementation.
  */
 export type BudgetWarningLevel = "none" | "caution" | "warning" | "danger";
 

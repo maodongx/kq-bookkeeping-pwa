@@ -40,6 +40,9 @@ export function SpendingClient() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "未知错误";
       toast.danger("保存失败，请重试", { description: message });
+      // Re-thrown so the modal keeps the entry on screen to retry, rather than
+      // clearing the amount and closing on a failed write.
+      throw error;
     }
   };
 

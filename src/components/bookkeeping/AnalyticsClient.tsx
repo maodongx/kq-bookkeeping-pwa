@@ -23,11 +23,12 @@ import {
   PREDICTION_EXCLUDED_CATEGORY_IDS,
   updateSpendingTransaction,
 } from "@/lib/bookkeeping-data";
-import { monthBoundariesLocal } from "@/lib/date";
+import { monthBoundariesLocal, todayLocal } from "@/lib/date";
 import { formatCurrency } from "@/lib/currency";
 import { convertCurrency, type RateMap } from "@/lib/exchange-rates";
 import type { Currency } from "@/lib/types";
 import type {
+  BudgetWarningLevel,
   CategoryBudget,
   CategorySpendingSummary,
   SpendingCategory,
@@ -133,7 +134,18 @@ function computeSummaries({
     ...relevantBudgetIds,
   ]);
 
-  return SPENDING_CATEGORIES.filter((cat) =>
+  const knownIds = new Set(SPENDING_CATEGORIES.map((c) => c.id));
+
+  // Spending on a category id that isn't in SPENDING_CATEGORIES (a legacy or
+  // typo'd row) was dropped here while still counting toward the chart's total,
+  // so the accordion rows silently summed to less than the header with nothing
+  // explaining the gap. Roll those into a 未知 bucket instead — same treatment
+  // /details already gives them.
+  const orphanSpent = [...spendingMap.entries()]
+    .filter(([id]) => !knownIds.has(id))
+    .reduce((sum, [, amount]) => sum + amount, 0);
+
+  const summaries = SPENDING_CATEGORIES.filter((cat) =>
     relevantCategoryIds.has(cat.id)
   ).map((cat) => {
     const spent = spendingMap.get(cat.id) ?? 0;
@@ -160,12 +172,18 @@ function computeSummaries({
     // budgets span the whole year, so a linear projection isn't useful.
     // Also skip categories that are pre-entered fixed costs (e.g. 房租
     // paid in full on day 1 always reads as "danger" by projection).
-    const warningLevel =
-      budgetAmount &&
-      viewMode === "monthly" &&
-      !PREDICTION_EXCLUDED_CATEGORY_IDS.has(cat.id)
-        ? calculateBudgetWarning(spent, budgetAmount, dayOfMonth, daysInMonth)
-        : "none";
+    //
+    // Excluded categories skip the *projection* but still report an actual
+    // breach. Skipping them wholesale meant a genuine 房租 overspend never
+    // surfaced at all.
+    let warningLevel: BudgetWarningLevel = "none";
+    if (budgetAmount && viewMode === "monthly") {
+      warningLevel = PREDICTION_EXCLUDED_CATEGORY_IDS.has(cat.id)
+        ? spent > budgetAmount
+          ? "danger"
+          : "none"
+        : calculateBudgetWarning(spent, budgetAmount, dayOfMonth, daysInMonth);
+    }
 
     return {
       category: cat,
@@ -178,6 +196,20 @@ function computeSummaries({
       warningLevel,
     };
   });
+
+  if (orphanSpent > 0) {
+    summaries.push({
+      category: { id: "__unknown__", name: "未知", icon: "HelpCircle", sortOrder: 999 },
+      totalSpent: orphanSpent,
+      budget: null,
+      percentUsed: null,
+      projectedOverspend: false,
+      budgetType: null,
+      warningLevel: "none",
+    });
+  }
+
+  return summaries;
 }
 
 interface AnalyticsClientProps {
@@ -311,8 +343,15 @@ export function AnalyticsClient({
   // Highest pace-based warning across all monthly budgets. Danger trumps
   // warning; caution and none don't trigger the cat popup. Only computed
   // in monthly view — annual budgets don't have pace warnings.
+  //
+  // Gated on `isCurrentMonth` because the popup's copy says "预计本月会超支".
+  // For a past month `dayOfMonth` is pinned to `daysInMonth`, so the
+  // projection collapses into "did this month use ≥80% of budget" and browsing
+  // back through history fired the popup about months that already closed —
+  // and acknowledging it started the 24h cooldown, muting the *real* warning
+  // for the current month.
   let highestWarning: WarningModalLevel | null = null;
-  if (viewMode === "monthly") {
+  if (viewMode === "monthly" && isCurrentMonth) {
     for (const s of summaries) {
       if (s.warningLevel === "danger") {
         highestWarning = "danger";
@@ -384,8 +423,15 @@ export function AnalyticsClient({
       // Local in-place update — avoids a refetch + loading flash. Monthly
       // view's list is derived from this array via a date-range filter,
       // so both views stay in sync automatically.
+      //
+      // An edit can move a row out of the loaded year entirely. Keeping it
+      // would leave it counted in this year's total (and in the other year's,
+      // once that year is fetched) — the same expense in two annual totals.
+      const stillInYear = saved.date >= `${year}-01-01` && saved.date <= `${year}-12-31`;
       setYearTransactions((prev) =>
-        prev.map((t) => (t.id === saved.id ? saved : t))
+        stillInYear
+          ? prev.map((t) => (t.id === saved.id ? saved : t))
+          : prev.filter((t) => t.id !== saved.id)
       );
       toast.success("已保存");
     } catch (error) {
@@ -422,8 +468,13 @@ export function AnalyticsClient({
           }}
         >
           <ToggleButton id="monthly">月度</ToggleButton>
-          <ToggleButtonGroup.Separator />
-          <ToggleButton id="annual">年度</ToggleButton>
+          {/* Separator belongs *inside* the button it precedes — it's absolutely
+              positioned and the group is not a positioned ancestor, so as a
+              direct child it left the flex flow and the divider disappeared. */}
+          <ToggleButton id="annual">
+            <ToggleButtonGroup.Separator />
+            年度
+          </ToggleButton>
         </ToggleButtonGroup>
       </div>
 
@@ -467,7 +518,11 @@ export function AnalyticsClient({
             <SpendingLineChart
               transactions={monthlyTransactions}
               startDate={startDate}
-              endDate={endDate}
+              // Stop the current month's line at today. Running it to the end
+              // of the month zero-filled days that haven't happened yet, so the
+              // chart always cratered to 0 at the right edge and read as a
+              // sudden stop in spending.
+              endDate={isCurrentMonth ? todayLocal() : endDate}
               displayCurrency={displayCurrency}
               rates={rates}
               granularity="day"
@@ -484,7 +539,11 @@ export function AnalyticsClient({
             <SpendingLineChart
               transactions={yearTransactions}
               startDate={`${year}-01-01`}
-              endDate={`${year}-12-31`}
+              // Same reason as the monthly chart: zero-filling the rest of the
+              // current year drew a flat 0 line from this month to December.
+              endDate={
+                year === now.getFullYear() ? todayLocal() : `${year}-12-31`
+              }
               displayCurrency={displayCurrency}
               rates={rates}
               granularity="month"
