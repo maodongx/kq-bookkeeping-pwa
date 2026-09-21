@@ -20,9 +20,17 @@ import { RateMap, convertCurrency } from "./exchange-rates";
  * matches how `totalCost` was historically aggregated on the dashboard
  * and keeps the whole picture self-consistent with `netWorth`.
  *
- * Both bounds are optional. Omit `from` for "since the beginning of
- * time", omit `to` for "up to now". Both are treated inclusively against
- * transaction `date` strings (YYYY-MM-DD).
+ * Both bounds are optional. Omit `from` for "since the beginning of time",
+ * omit `to` for "up to now".
+ *
+ * The window is **`(from, to]`** — `from` exclusive, `to` inclusive. The
+ * asymmetry is deliberate and load-bearing for Modified-Dietz: the caller's
+ * beginning market value is `netWorth` *on* the start date, and that figure
+ * already includes every transaction dated that day (`getAssetValueOnDate`
+ * replays `tx.date <= date`). Counting those same rows here as in-window
+ * capital subtracted them a second time from the numerator. A lone
+ * ¥1,000,000 deposit on the window's first day with zero market movement
+ * reported 近1月 as −66.67% instead of 0%.
  */
 export function capitalFlowsBetween(
   transactions: Transaction[],
@@ -38,7 +46,7 @@ export function capitalFlowsBetween(
 
   let total = 0;
   for (const tx of transactions) {
-    if (from && tx.date < from) continue;
+    if (from && tx.date <= from) continue;
     if (to && tx.date > to) continue;
 
     const nativeCurrency = assetCurrency.get(tx.asset_id);

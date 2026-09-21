@@ -191,6 +191,8 @@ function modifiedDietzReturn({
   rates,
 }: DietzInput): number | null {
   if (!startPoint || startPoint.netWorth <= 0) return null;
+  // `startPoint.date` is exclusive here — flows on that day are already inside
+  // `startPoint.netWorth` (the BMV). See capitalFlowsBetween's window docs.
   const netCF = capitalFlowsBetween(
     transactions,
     rawAssets,
