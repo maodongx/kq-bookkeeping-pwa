@@ -48,9 +48,16 @@ export function NetWorthLineChart({
   // line at the top of the chart. Instead, frame the axis around the actual
   // value range with ~8% headroom on each side so the variation fills the plot.
   // Guard the degenerate flat-series case (min === max) with an absolute pad.
-  const values = data.map((d) => d.netWorth);
-  const dataMin = Math.min(...values);
-  const dataMax = Math.max(...values);
+  // Reduce rather than `Math.min(...values)`: the ALL range grows one point per
+  // snapshot day, and spreading a large array into a call blows the argument
+  // limit. Nobody has 10 years of history yet, but the failure mode is a hard
+  // crash of the whole dashboard, so it isn't worth leaving to chance.
+  let dataMin = data[0].netWorth;
+  let dataMax = data[0].netWorth;
+  for (const d of data) {
+    if (d.netWorth < dataMin) dataMin = d.netWorth;
+    if (d.netWorth > dataMax) dataMax = d.netWorth;
+  }
   const span = dataMax - dataMin;
   const pad = span > 0 ? span * 0.08 : Math.max(Math.abs(dataMax) * 0.05, 1);
   const yMin = dataMin - pad;
@@ -87,8 +94,12 @@ export function NetWorthLineChart({
             <YAxis
               domain={[yMin, yMax]}
               tick={{ fontSize: 11 }}
+              // Threshold on the magnitude, not the signed value: `v >= 10000`
+              // sent every negative tick down the plain-number branch, so a
+              // -150,000 tick rendered as "-150,000" while +150,000 rendered as
+              // "15.0万" on the same axis.
               tickFormatter={(v: number) =>
-                v >= 10000
+                Math.abs(v) >= 10000
                   ? `${(v / 10000).toFixed(1)}万`
                   : Math.round(v).toLocaleString()
               }

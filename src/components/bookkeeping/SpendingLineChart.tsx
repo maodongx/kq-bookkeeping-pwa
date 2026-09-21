@@ -157,8 +157,13 @@ export function SpendingLineChart({
             />
             <YAxis
               tick={{ fontSize: 11 }}
+              // Same shape as the net-worth axis: threshold on magnitude, and
+              // round the plain branch so a fractional tick can't render as
+              // "1234.5678".
               tickFormatter={(v: number) =>
-                v >= 10000 ? `${(v / 10000).toFixed(0)}万` : v.toLocaleString()
+                Math.abs(v) >= 10000
+                  ? `${(v / 10000).toFixed(0)}万`
+                  : Math.round(v).toLocaleString()
               }
               width={45}
             />

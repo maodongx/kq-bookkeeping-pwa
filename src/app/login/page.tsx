@@ -43,11 +43,17 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             <TextField name="email" type="email" isRequired>
               <Label>邮箱</Label>
+              {/* autoComplete matters here: this is a phone-first PWA opened
+                  daily, and without these hints iOS Keychain and password
+                  managers won't offer to fill the form. */}
               <Input
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 variant="secondary"
+                autoComplete="email"
+                autoCapitalize="none"
+                spellCheck={false}
               />
             </TextField>
 
@@ -58,6 +64,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 variant="secondary"
+                autoComplete="current-password"
               />
             </TextField>
 
