@@ -2,6 +2,11 @@ import { Currency, AssetCategory, TransactionType, AssetTag, RiskLevel } from ".
 
 export function formatCurrency(value: number, currency: Currency): string {
   const symbol = currency === "USD" ? "$" : "¥";
+  // A non-finite value would otherwise render as the literal "$NaN" or "$∞".
+  // Show the same em dash the percentage stats use for "not available" — the
+  // computation is still wrong, but the user sees a blank rather than garbage
+  // where a balance should be.
+  if (!Number.isFinite(value)) return "—";
   const decimals = currency === "JPY" ? 0 : 2;
   const formatted = Math.abs(value).toLocaleString(undefined, {
     minimumFractionDigits: decimals,
