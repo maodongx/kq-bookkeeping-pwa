@@ -63,6 +63,47 @@ export function deriveTxPayload(
 }
 
 /**
+ * Validate form values before they reach the DB. Returns a user-facing message
+ * describing the first problem, or `null` when the values are usable.
+ *
+ * `<input type="number" required>` blocks *empty* fields but happily accepts a
+ * leading minus or a zero. A negative 买入 quantity used to sail through and
+ * then *decrement* `totalQty` and `totalCost` inside `computeHolding`, so the
+ * position's market value, its 平均成本, and the dashboard's capital-flow total
+ * all silently went wrong with no way to tell from the UI that anything was
+ * off.
+ *
+ * `heldQty` is optional and only meaningful when creating a sell: pass the
+ * current holding to reject selling more units than exist, which would
+ * otherwise drive `totalQty` negative and produce a negative market value.
+ */
+export function validateTxValues(
+  values: TransactionFormValues,
+  category: AssetCategory,
+  heldQty?: number
+): string | null {
+  const inv = isInvestment(category);
+
+  if (inv) {
+    const qty = parseFloat(values.quantity);
+    const price = parseFloat(values.price);
+    if (!Number.isFinite(qty) || qty <= 0) return "数量必须大于 0";
+    if (!Number.isFinite(price) || price <= 0) return "单价必须大于 0";
+    if (values.type === "sell" && heldQty !== undefined && qty > heldQty) {
+      return `卖出数量超过持仓 (${heldQty})`;
+    }
+    return null;
+  }
+
+  const amount = parseFloat(values.amount);
+  if (!Number.isFinite(amount)) return "请输入有效金额";
+  // Adjustments are signed deltas — a negative one is a downward correction
+  // and entirely legitimate. Deposits and withdrawals are magnitudes.
+  if (values.type !== "adjustment" && amount <= 0) return "金额必须大于 0";
+  return null;
+}
+
+/**
  * Controlled form fields for a transaction. Parents own the state via
  * `values` + `onChange`. The fields rendered are category-aware:
  *   - Investments (buy/sell): quantity + unit price.
@@ -94,9 +135,17 @@ export function TransactionFields({
 }) {
   const inv = isInvestment(category);
   const availableTypes = getAvailableTxTypes(category);
-  const isAdjustmentAsNewBalance =
-    !inv && values.type === "adjustment" && currentBalance !== undefined;
-  const amountPlaceholder = isAdjustmentAsNewBalance ? "新余额" : "金额";
+  const isAdjustment = !inv && values.type === "adjustment";
+  const isAdjustmentAsNewBalance = isAdjustment && currentBalance !== undefined;
+  // Three distinct meanings for one input, so say which one is in play. The
+  // edit form deliberately exposes the stored signed delta rather than a new
+  // balance; labelling that "金额" invited users to retype it as a balance and
+  // silently book the difference as gain.
+  const amountPlaceholder = isAdjustmentAsNewBalance
+    ? "新余额"
+    : isAdjustment
+      ? "调整金额 (增减)"
+      : "金额";
 
   return (
     <>
@@ -123,6 +172,7 @@ export function TransactionFields({
           <Input
             type="number"
             step="any"
+            min="0"
             placeholder="数量"
             value={values.quantity}
             onChange={(e) => onChange("quantity", e.target.value)}
@@ -131,6 +181,7 @@ export function TransactionFields({
           <Input
             type="number"
             step="any"
+            min="0"
             placeholder="单价"
             value={values.price}
             onChange={(e) => onChange("price", e.target.value)}
@@ -141,6 +192,9 @@ export function TransactionFields({
         <Input
           type="number"
           step="any"
+          // Adjustments carry a signed delta, so negatives are valid there and
+          // only there.
+          min={values.type === "adjustment" ? undefined : "0"}
           placeholder={amountPlaceholder}
           value={values.amount}
           onChange={(e) => onChange("amount", e.target.value)}

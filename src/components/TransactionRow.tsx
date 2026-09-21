@@ -10,12 +10,13 @@ import {
   TX_TYPE_LABELS,
   isInvestment,
 } from "@/lib/currency";
-import { Button, Separator } from "@heroui/react";
+import { Button, Separator, toast } from "@heroui/react";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import {
   TransactionFields,
   TransactionFormValues,
   deriveTxPayload,
+  validateTxValues,
 } from "./TransactionFields";
 
 function valuesFromTx(tx: Transaction): TransactionFormValues {
@@ -59,6 +60,14 @@ export function TransactionRow({
     setValues((prev) => ({ ...prev, [key]: value }));
   }
 
+  // The row stays mounted when the editor closes (TransactionList keys by
+  // tx.id), so without this an abandoned draft survives 取消 and reappears —
+  // and re-saving would commit the edit the user backed out of.
+  function handleCancel() {
+    setValues(valuesFromTx(tx));
+    onEditToggle();
+  }
+
   async function handleDelete() {
     const ok = await confirm({
       heading: "确定删除此交易？",
@@ -69,20 +78,40 @@ export function TransactionRow({
     if (!ok) return;
     setDeleting(true);
     const supabase = createClient();
-    await supabase.from("transactions").delete().eq("id", tx.id);
+    const { error } = await supabase.from("transactions").delete().eq("id", tx.id);
+    // Re-enable the button on failure — leaving `deleting` true made the trash
+    // icon permanently dead until a reload.
+    setDeleting(false);
+    if (error) {
+      toast.danger("删除失败", { description: error.message });
+      return;
+    }
     router.refresh();
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+
+    const invalid = validateTxValues(values, category);
+    if (invalid) {
+      toast.danger(invalid);
+      return;
+    }
+
     setSaving(true);
     const supabase = createClient();
-    await supabase
+    const { error } = await supabase
       .from("transactions")
       .update(deriveTxPayload(values, category))
       .eq("id", tx.id);
 
     setSaving(false);
+    // Keep the editor open on failure so the user's edits aren't lost behind a
+    // row that silently reverted.
+    if (error) {
+      toast.danger("保存失败", { description: error.message });
+      return;
+    }
     onEditToggle();
     router.refresh();
   }
@@ -102,7 +131,7 @@ export function TransactionRow({
             variant="outline"
             size="sm"
             className="flex-1"
-            onPress={onEditToggle}
+            onPress={handleCancel}
           >
             取消
           </Button>

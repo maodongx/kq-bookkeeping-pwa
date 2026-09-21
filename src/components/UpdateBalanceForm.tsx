@@ -31,7 +31,7 @@ export function UpdateBalanceForm({
     const newBalance = parseFloat(value);
     const diff = newBalance - currentBalance;
 
-    if (diff === 0) {
+    if (!Number.isFinite(diff) || diff === 0) {
       setOpen(false);
       setLoading(false);
       return;
@@ -40,7 +40,12 @@ export function UpdateBalanceForm({
     const { error } = await supabase.from("transactions").insert({
       asset_id: assetId,
       type: "adjustment",
-      quantity: Math.abs(diff),
+      // Signed, matching `amount`. `computeHolding` accumulates adjustment
+      // quantities (`totalQty += tx.quantity`), so storing the absolute value
+      // made a downward correction *increase* the unit count — and the edit
+      // path already wrote it signed, so re-saving an untouched row changed
+      // the stored value.
+      quantity: diff,
       price: 1,
       amount: diff,
       date: todayLocal(),

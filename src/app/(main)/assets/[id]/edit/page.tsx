@@ -21,6 +21,7 @@ export default function EditAssetPage() {
   const [initialValues, setInitialValues] =
     useState<AssetFormValues>(EMPTY_VALUES);
   const [loading, setLoading] = useState(false);
+  const [hasTransactions, setHasTransactions] = useState(false);
 
   // createClient() is constructed inside the effect (and again inside
   // handleSubmit) rather than at render — that way React can include the
@@ -29,13 +30,18 @@ export default function EditAssetPage() {
   useEffect(() => {
     const supabase = createClient();
     async function load() {
-      const { data } = await supabase
-        .from("assets")
-        .select("*")
-        .eq("id", id)
-        .single();
+      // The transaction count decides whether 资产类型 / 币种 stay editable —
+      // changing either after transactions exist reinterprets their amounts.
+      const [{ data }, { count }] = await Promise.all([
+        supabase.from("assets").select("*").eq("id", id).single(),
+        supabase
+          .from("transactions")
+          .select("id", { count: "exact", head: true })
+          .eq("asset_id", id),
+      ]);
       if (!data) return;
       const a = data as Asset;
+      setHasTransactions((count ?? 0) > 0);
       setInitialValues({
         name: a.name,
         category: a.category,
@@ -91,6 +97,7 @@ export default function EditAssetPage() {
       onSubmit={handleSubmit}
       onCancel={() => router.back()}
       submitting={loading}
+      lockValuationFields={hasTransactions}
     />
   );
 }

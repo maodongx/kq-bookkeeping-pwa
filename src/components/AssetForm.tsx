@@ -80,12 +80,28 @@ export function AssetForm({
   onSubmit,
   onCancel,
   submitting,
+  lockValuationFields = false,
 }: {
   mode: "create" | "edit";
   initialValues?: AssetFormValues;
   onSubmit: (values: AssetFormValues) => void | Promise<void>;
   onCancel: () => void;
   submitting: boolean;
+  /**
+   * Freeze 资产类型 and 币种. Set once an asset has transactions, because both
+   * fields reinterpret the numbers already stored against it:
+   *
+   *   - Category picks the valuation model. Flipping a bank account (whose
+   *     deposit rows store `quantity = amount`) to 美股 makes `computeHolding`
+   *     switch to `totalQty * current_price` — a ¥1,000,000 balance becomes
+   *     1,000,000 *units*, and net worth explodes once a price is fetched.
+   *     The reverse turns a stock's market value into its cost basis and zeroes
+   *     its gain.
+   *   - Currency changes the FX rate the same amounts are converted at.
+   *
+   * Neither rewrites the transactions, so the change is silent and lossy.
+   */
+  lockValuationFields?: boolean;
 }) {
   const [values, setValues] = useState<AssetFormValues>(initialValues);
 
@@ -125,6 +141,7 @@ export function AssetForm({
             <Field label="资产类型">
               <NativeSelect
                 value={values.category}
+                disabled={lockValuationFields}
                 onChange={(e) =>
                   handleCategoryChange(e.target.value as AssetCategory)
                 }
@@ -148,6 +165,7 @@ export function AssetForm({
             <Field label="币种">
               <NativeSelect
                 value={values.currency}
+                disabled={lockValuationFields}
                 onChange={(e) => update("currency", e.target.value as Currency)}
               >
                 {Object.entries(CURRENCY_LABELS).map(([k, v]) => (
@@ -157,6 +175,12 @@ export function AssetForm({
                 ))}
               </NativeSelect>
             </Field>
+
+            {lockValuationFields && (
+              <p className="text-xs text-muted">
+                该资产已有交易记录，资产类型与币种不可修改（会导致已有金额被重新解释）。
+              </p>
+            )}
 
             {inv && (
               <Field label="代码">

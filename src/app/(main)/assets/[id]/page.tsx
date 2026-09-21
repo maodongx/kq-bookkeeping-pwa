@@ -88,20 +88,27 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
         </Card.Content>
       </Card>
 
-      {hasPerAssetGainLoss(a.category) ? (
-        // Investments (buy/sell) and mmf/managed (deposit/withdraw/adjustment)
-        // both use AddTransactionForm. For mmf/managed the form also takes
-        // `currentBalance` so adjustments prompt for the new total balance
-        // (matching UpdateBalanceForm's UX for bank/cash) instead of
-        // making the user do delta math.
-        <AddTransactionForm
-          assetId={a.id}
-          category={a.category}
-          currentBalance={balance}
-        />
-      ) : (
-        // Bank / cash / other — quick "set current balance" UX. Creates an
-        // adjustment; users treat this as the running balance for daily use.
+      {/*
+        Every category gets AddTransactionForm. For bank/cash/other this used
+        to be omitted, leaving 更新余额 — which writes an `adjustment` — as the
+        only way to change a balance. Because `capitalFlowsBetween` treats
+        adjustments as market effect rather than contributed capital,每 paycheck
+        deposited into a tracked account inflated the dashboard's 累计盈亏 by
+        its full amount. Users need 存入 / 取出 to record real capital flows.
+      */}
+      <AddTransactionForm
+        assetId={a.id}
+        category={a.category}
+        currentBalance={balance}
+        heldQty={totalQty}
+      />
+
+      {/*
+        Bank / cash / other additionally keep the one-tap "set the current
+        balance" shortcut, which is the natural way to log interest or
+        reconcile against a statement.
+      */}
+      {!hasPerAssetGainLoss(a.category) && (
         <UpdateBalanceForm assetId={a.id} currentBalance={balance} currency={a.currency} />
       )}
 
