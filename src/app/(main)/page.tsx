@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { Asset, AssetPriceSnapshot, ExchangeRateSnapshot, Currency, Transaction } from "@/lib/types";
 import { fetchLatestRates } from "@/lib/exchange-rates";
 import { computeHolding } from "@/lib/asset-calculations";
@@ -29,29 +30,35 @@ export default function DashboardPage() {
 async function DashboardBody() {
   const supabase = await createClient();
 
+  // All four tables are read in full and must be *complete* — a silently
+  // truncated snapshot page would desync the chart from 总资产 (see
+  // fetchAllRows).
   const [
     { data: assets },
-    { data: transactions },
+    { rows: txList },
     rates,
     { data: { user } },
-    { data: priceSnapshots },
-    { data: rateSnapshots },
+    { rows: pSnaps },
+    { rows: rSnaps },
   ] = await Promise.all([
     supabase.from("assets").select("*"),
-    supabase.from("transactions").select("*"),
+    fetchAllRows<Transaction>((from, to) =>
+      supabase.from("transactions").select("*").range(from, to)
+    ),
     fetchLatestRates(supabase),
     supabase.auth.getUser(),
-    supabase.from("asset_price_snapshots").select("*").order("date"),
-    supabase.from("exchange_rate_snapshots").select("*").order("date"),
+    fetchAllRows<AssetPriceSnapshot>((from, to) =>
+      supabase.from("asset_price_snapshots").select("*").order("date").range(from, to)
+    ),
+    fetchAllRows<ExchangeRateSnapshot>((from, to) =>
+      supabase.from("exchange_rate_snapshots").select("*").order("date").range(from, to)
+    ),
   ]);
 
   const defaultCurrency =
     (user?.user_metadata?.default_currency as Currency) || "USD";
 
   const assetList = (assets || []) as Asset[];
-  const txList = (transactions || []) as Transaction[];
-  const pSnaps = (priceSnapshots || []) as AssetPriceSnapshot[];
-  const rSnaps = (rateSnapshots || []) as ExchangeRateSnapshot[];
 
   // `last_price_update` is nullable on the row, so filter nulls out and
   // grab the latest. Returns null when no asset has ever had a price

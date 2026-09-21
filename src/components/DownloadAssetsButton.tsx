@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Download } from "lucide-react";
 import { Button, toast } from "@heroui/react";
 import { createClient } from "@/lib/supabase/client";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { computeHolding } from "@/lib/asset-calculations";
 import { convertCurrency, fetchLatestRates } from "@/lib/exchange-rates";
 import { todayLocal } from "@/lib/date";
@@ -31,21 +32,24 @@ export function DownloadAssetsButton() {
     setBusy(true);
     try {
       const supabase = createClient();
+      // Paginated: this is a backup, so a silently truncated transaction list
+      // would understate every holding with no indication anything was missing.
       const [
         { data: assets, error: ea },
-        { data: transactions, error: et },
+        { rows: txList, error: et },
         rates,
       ] = await Promise.all([
         supabase.from("assets").select("*"),
-        supabase.from("transactions").select("*"),
+        fetchAllRows<Transaction>((from, to) =>
+          supabase.from("transactions").select("*").range(from, to)
+        ),
         fetchLatestRates(supabase),
       ]);
 
-      const firstError = ea ?? et;
-      if (firstError) throw firstError;
+      if (ea) throw ea;
+      if (et) throw new Error(et);
 
       const assetList = (assets ?? []) as Asset[];
-      const txList = (transactions ?? []) as Transaction[];
 
       const rows = assetList.map((asset) => {
         const { totalQty, marketValue } = computeHolding(asset, txList);

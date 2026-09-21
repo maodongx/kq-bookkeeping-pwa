@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import {
   Asset,
   AssetCategory,
@@ -61,16 +62,20 @@ async function AssetsBody() {
 
   const [
     { data: assets },
-    { data: transactions },
-    { data: priceSnapshots },
+    { rows: txList },
+    { rows: priceSnaps },
     rates,
     {
       data: { user },
     },
   ] = await Promise.all([
     supabase.from("assets").select("*"),
-    supabase.from("transactions").select("*"),
-    supabase.from("asset_price_snapshots").select("*").order("date"),
+    fetchAllRows<Transaction>((from, to) =>
+      supabase.from("transactions").select("*").range(from, to)
+    ),
+    fetchAllRows<AssetPriceSnapshot>((from, to) =>
+      supabase.from("asset_price_snapshots").select("*").order("date").range(from, to)
+    ),
     fetchLatestRates(supabase),
     supabase.auth.getUser(),
   ]);
@@ -79,8 +84,6 @@ async function AssetsBody() {
     (user?.user_metadata?.default_currency as Currency) || "USD";
 
   const assetList = (assets || []) as Asset[];
-  const txList = (transactions || []) as Transaction[];
-  const priceSnaps = (priceSnapshots || []) as AssetPriceSnapshot[];
 
   // Reference dates for month-over-month and day-over-day returns.
   // `getAssetValueOnDate` walks backwards from these to find the
