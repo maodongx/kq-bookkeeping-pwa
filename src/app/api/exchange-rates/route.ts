@@ -10,8 +10,15 @@ interface ExternalRateResponse {
   rates: Record<string, number>;
 }
 
+// Matches the prices route: a hung upstream must not hold the serverless
+// function open until the platform kills it, because `refreshAllPrices`
+// Promise.all's both routes and would hang behind this one.
+const FETCH_TIMEOUT_MS = 8_000;
+
 async function fetchRatesForBase(base: Currency): Promise<Record<Currency, number>> {
-  const res = await fetch(`https://open.er-api.com/v6/latest/${base}`);
+  const res = await fetch(`https://open.er-api.com/v6/latest/${base}`, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
   if (!res.ok) throw new Error(`Exchange rate API error for ${base}: ${res.status}`);
 
   const data: ExternalRateResponse = await res.json();
@@ -20,7 +27,15 @@ async function fetchRatesForBase(base: Currency): Promise<Record<Currency, numbe
   const rates: Record<string, number> = {};
   for (const target of CURRENCIES) {
     if (target === base) continue;
-    rates[target] = data.rates[target];
+    const rate = Number(data.rates?.[target]);
+    // Drop anything non-numeric rather than letting `undefined` through. A
+    // row with a missing `rate` key makes PostgREST reject the whole bulk
+    // upsert ("All object keys must match"), which would lose the other
+    // currencies' rates for the day too.
+    if (!Number.isFinite(rate) || rate <= 0) {
+      throw new Error(`Exchange rate API omitted ${base}->${target}`);
+    }
+    rates[target] = rate;
   }
   return rates as Record<Currency, number>;
 }
@@ -65,9 +80,12 @@ export async function POST() {
       date: today,
     }));
 
-    await supabase
+    // supabase-js resolves with `{ error }` rather than rejecting, so an
+    // unchecked await here reported a total write failure as success.
+    const { error } = await supabase
       .from("exchange_rate_snapshots")
       .upsert(rows, { onConflict: "base_currency,target_currency,date" });
+    if (error) errors.push(`汇率保存失败: ${error.message}`);
   }
 
   const rateMap: Record<string, Record<string, number>> = {};
