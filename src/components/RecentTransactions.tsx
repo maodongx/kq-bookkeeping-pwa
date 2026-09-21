@@ -37,7 +37,13 @@ export function RecentTransactions({
   const recent = transactions
     .filter((tx) => {
       const asset = assetById.get(tx.asset_id);
-      return asset ? investmentCategories.has(asset.category) : false;
+      if (!asset || !investmentCategories.has(asset.category)) return false;
+      // Filter on the transaction type too, not just the asset's category.
+      // The forms only offer 买入/卖出 for investments, but a row can still be
+      // a deposit or adjustment if the asset was reclassified from a bank
+      // account. Those rendered with `-tx.amount` (the "not a buy" branch
+      // below), showing a deposit as an outflow.
+      return tx.type === "buy" || tx.type === "sell";
     })
     // Date (YYYY-MM-DD) desc, then created_at desc as a stable tiebreaker
     // for multiple same-day entries.
