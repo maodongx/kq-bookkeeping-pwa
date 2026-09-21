@@ -99,13 +99,41 @@ export function AllocationPieChart({
   /** Small label shown above the center total (e.g. "总计"). */
   centerLabel?: string;
 }) {
+  // A pie can't draw a non-positive wedge, so those groups are excluded from
+  // the chart. They still have to count toward the center total: the sum of all
+  // groups *is* net worth (that's how groupAllocation builds them), and the
+  // center is labelled 总计. Summing only the drawn slices made the donut's
+  // center disagree with the 总资产 card directly above it whenever any group
+  // was negative — e.g. an account withdrawn past zero.
   const filtered = data
     .filter((d) => d.value > 0)
     .sort((a, b) => b.value - a.value); // biggest slice first — chip list reads top-to-bottom
 
-  if (filtered.length === 0) return null;
+  const netTotal = data.reduce((sum, d) => sum + d.value, 0);
+  // Percentages must be relative to what's actually drawn, otherwise the chip
+  // figures wouldn't add to 100% and would contradict Recharts' own on-slice
+  // labels (which it derives from the slice values it was handed).
+  const sliceTotal = filtered.reduce((sum, d) => sum + d.value, 0);
+  const hasExcluded = filtered.length !== data.length;
 
-  const total = filtered.reduce((sum, d) => sum + d.value, 0);
+  if (filtered.length === 0) {
+    // Everything is zero or negative. Say so rather than making the whole card
+    // vanish with no explanation.
+    if (data.length === 0) return null;
+    return (
+      <Card>
+        <Card.Header>
+          <Card.Title>{title}</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <p className="py-6 text-center text-sm text-muted">
+            暂无可展示的正值资产
+            {currency ? `（合计 ${formatCurrency(netTotal, currency)}）` : ""}
+          </p>
+        </Card.Content>
+      </Card>
+    );
+  }
 
   // Resolve color per slice: explicit colorMap override wins; fallbacks
   // are indexed by slice position so the color sequence is stable.
@@ -197,18 +225,24 @@ export function AllocationPieChart({
                 <span className="text-[11px] text-muted">{centerLabel}</span>
               )}
               <span className="text-base font-bold tabular-nums">
-                {formatCurrency(total, currency)}
+                {formatCurrency(netTotal, currency)}
               </span>
             </div>
           )}
         </div>
+
+        {hasExcluded && (
+          <p className="mt-2 text-center text-[11px] text-muted">
+            部分分组为零或负值，未在图中显示（合计已包含）
+          </p>
+        )}
 
         {/* HeroUI Chip legend: matches theme, each chip shows a colored dot,
             the category name, and its percentage. Arranged in a flex wrap
             so it reflows on narrow screens. */}
         <div className="mt-3 flex flex-wrap justify-center gap-2">
           {filtered.map((slice, i) => {
-            const pct = (slice.value / total) * 100;
+            const pct = sliceTotal > 0 ? (slice.value / sliceTotal) * 100 : 0;
             return (
               <Chip key={slice.name} size="sm" variant="secondary">
                 <span
