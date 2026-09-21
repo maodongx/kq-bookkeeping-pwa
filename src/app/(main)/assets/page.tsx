@@ -11,7 +11,7 @@ import {
 } from "@/lib/types";
 import { hasPerAssetGainLoss } from "@/lib/currency";
 import { computeHolding } from "@/lib/asset-calculations";
-import { getAssetValueOnDate } from "@/lib/chart-utils";
+import { getAssetValueOnDate, hasHistoricalPrice } from "@/lib/chart-utils";
 import { daysAgoLocal } from "@/lib/date";
 import { convertCurrency, fetchLatestRates } from "@/lib/exchange-rates";
 import { AssetsClient, CategoryGroup } from "@/components/AssetsClient";
@@ -107,15 +107,24 @@ async function AssetsBody() {
     let dayPct: number | null = null;
     let dayDelta: number | null = null;
     if (showGain) {
-      const monthValue = getAssetValueOnDate(asset, txList, priceSnaps, monthAgo);
-      const dayValue = getAssetValueOnDate(asset, txList, priceSnaps, dayAgo);
-      if (monthValue > 0) {
-        monthDelta = marketValue - monthValue;
-        monthPct = (monthDelta / monthValue) * 100;
+      // Only report a period return when a real price snapshot reaches back
+      // that far. Without one, getAssetValueOnDate values the position at
+      // *today's* price, which forces the delta to exactly zero — so the row
+      // showed a confident "+0.00%" for a window it knew nothing about.
+      // `—` (null) is the honest answer.
+      if (hasHistoricalPrice(asset, priceSnaps, monthAgo)) {
+        const monthValue = getAssetValueOnDate(asset, txList, priceSnaps, monthAgo);
+        if (monthValue > 0) {
+          monthDelta = marketValue - monthValue;
+          monthPct = (monthDelta / monthValue) * 100;
+        }
       }
-      if (dayValue > 0) {
-        dayDelta = marketValue - dayValue;
-        dayPct = (dayDelta / dayValue) * 100;
+      if (hasHistoricalPrice(asset, priceSnaps, dayAgo)) {
+        const dayValue = getAssetValueOnDate(asset, txList, priceSnaps, dayAgo);
+        if (dayValue > 0) {
+          dayDelta = marketValue - dayValue;
+          dayPct = (dayDelta / dayValue) * 100;
+        }
       }
     }
 

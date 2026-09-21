@@ -106,6 +106,30 @@ export function getAssetValueOnDate(
   return balance;
 }
 
+/**
+ * Whether a *real* historical price is known for `asset` on or before `date`.
+ *
+ * `getAssetValueOnDate` falls back to `asset.current_price` when no snapshot
+ * reaches back that far. That's the right call for the net-worth chart —
+ * valuing a position at some price beats silently dropping it — but it is the
+ * wrong basis for a "change since `date`" figure, because the fallback *is*
+ * today's price. The delta then works out to exactly zero and the assets tab
+ * reports a confident `近1月 +0.00%` for a window it actually knows nothing
+ * about.
+ *
+ * Callers computing a period return should check this first and render `—`
+ * instead. Balance-model assets (mmf/managed/bank/cash) always return true:
+ * their value comes from replaying transactions, so no price is involved.
+ */
+export function hasHistoricalPrice(
+  asset: Asset,
+  priceSnapshots: AssetPriceSnapshot[],
+  date: string
+): boolean {
+  if (!isInvestment(asset.category)) return true;
+  return priceSnapshots.some((s) => s.asset_id === asset.id && s.date <= date);
+}
+
 export function computeNetWorthTimeSeries(
   assets: Asset[],
   transactions: Transaction[],
