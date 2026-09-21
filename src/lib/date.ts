@@ -32,19 +32,6 @@ export function todayUTC(): string {
 }
 
 /**
- * Today's date in `YYYYMMDD` form (no separators), in Asia/Tokyo.
- *
- * Specifically for the Yahoo Finance JP BFF API, which accepts dates
- * as compact strings in JST. Kept here so the Tokyo conversion is
- * documented in one place.
- */
-export function todayTokyoCompact(): string {
-  return new Date()
-    .toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" })
-    .replace(/-/g, "");
-}
-
-/**
  * Local-time calendar boundaries for a given month. Returns the first
  * and last `YYYY-MM-DD` of the month, plus how many days it contains.
  * Using the local Date constructor (rather than UTC) means "May 2026"
